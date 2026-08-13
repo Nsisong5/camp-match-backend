@@ -1,22 +1,71 @@
+CODING INSTRUCTIONS 
+
+Do not redesign the architecture.
+Do not invent requirements beyond what a chunk states.
+Do not introduce a library, framework, or tool that isn't named in a chunk or in AI_instructions/.
+Do not modify a module or file outside the current chunk's "Files to create" / "Files to modify" lists.
+Do not bypass a port to reach an implementation directly.
+Do not import another module's internals, or reach into another module's database tables.
+Do not place business logic inside API routers/adapters.
+Do not import FastAPI, SQLAlchemy, or any infrastructure library inside domain code.
+Do not delete or weaken a test to make it pass.
+Do not weaken input validation to make a test pass.
+Do not silently change a public interface (a port, a DTO, an API contract) that a previous chunk defined.
+Do not mark a chunk complete unless every item in its Acceptance Criteria is actually true.
+Do not claim a test passed without having run it and seen it pass.
+Do not fabricate command output.
+Do not refactor code outside the current chunk's scope.
+Do not proceed to the next chunk unless explicitly given it.
+Do not leave an architectural decision you made undocumented.
+When blocked by real ambiguity — not "I'd prefer differently," but "the instructions conflict or don't specify" — stop, do not guess, and report exactly what is ambiguous.
+End of every chunk, always do this (unless the chunk says otherwise):
+Run the full test suite (poetry run pytest) and confirm the new tests from this chunk pass, and nothing else broke.
+Run poetry run ruff check ., poetry run ruff format --check ., and poetry run mypy src and fix anything the chunk's own new code triggers.
+Stage and commit your changes with a Conventional Commits message: type(scope): subject, e.g. feat(phase1): add FastAPI skeleton and health endpoint. Types: feat, fix, chore, docs, test, refactor, build, ci.
+Update AI_state/CURRENT_TASK.md to point at the next chunk, AI_state/PROGRESS.md to check off what you finished, AI_state/COMPLETED_WORK.md to add a one-line entry, and AI_state/SESSION_HANDOFF.md with the Completion Report below. (Chunks before 1.10 obviously can't do this yet — start doing it from Chunk 1.10 onward.)
+Produce a Completion Report in your reply with exactly these fields: What was completed / Files created / Files modified / Tests written / Tests run and result / Lint & type-check result / Known issues or deviations / Exact recommended next chunk.
+
+
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Structured JSON logging with request correlation IDs, wired at startup.
+Objective: Formalize the test layers, markers, and shared fixtures so every later chunk just adds tests into an existing, working harness.
 Files to create:
-src/camp_match/platform/logging/setup.py
-src/camp_match/platform/logging/middleware.py
+tests/__init__.py, tests/unit/__init__.py, tests/integration/__init__.py, tests/api/__init__.py, tests/architecture/__init__.py
+tests/conftest.py
 Files to modify:
-src/camp_match/app.py — call logging setup, register middleware.
+pyproject.toml — add [tool.pytest.ini_options].
 Implementation instructions:
-setup.py: a configure_logging(settings: Settings) -> None function that configures structlog to output JSON, with log level from settings.log_level.
-middleware.py: an ASGI middleware (or FastAPI @app.middleware("http")) that generates a request_id = str(uuid4()) per request, binds it into structlog.contextvars for the duration of the request, adds it as response header X-Request-ID, and clears the context after the response.
-In app.py, call configure_logging(get_settings()) and register the middleware inside create_app().
-Update http_error_handlers.py's log call to rely on the bound request_id context (no code change needed if using structlog.contextvars correctly — verify it shows up automatically in the log line).
-You must not: log settings wholesale (could contain secrets later), passwords, tokens, or full request bodies. Log only structured fields you explicitly name.
-Tests you must write: tests/api/test_request_id.py — confirms every response (including /health) carries an X-Request-ID header, and two different requests get two different IDs.
+In pyproject.toml:
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: pure logic, no I/O",
+    "integration: real adapters (db, external systems)",
+    "api: HTTP-level tests against the FastAPI app",
+    "architecture: import/dependency boundary checks",
+]
+
+In tests/conftest.py, define a reusable fixture:
+import pytest
+from httpx import ASGITransport, AsyncClient
+from camp_match.app import create_app
+
+@pytest.fixture
+async def client():
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+        
+Refactor tests/api/test_health.py, tests/api/test_error_handling.py, and tests/api/test_request_id.py from earlier chunks to use this shared client fixture instead of constructing their own client, to remove duplication.
+Add commands to README.md: run all tests poetry run pytest; run one layer poetry run pytest -m unit (also integration, api, architecture); run a single file poetry run pytest tests/api/test_health.py.
+Tests you must write: none new — this chunk is about consolidating the harness. Confirm all existing tests still pass after the refactor.
 Acceptance criteria:
-New test passes.
-Running the app and hitting /health prints a JSON log line containing request_id.
+poetry run pytest passes, all previously-written tests included.
+poetry run pytest -m api runs exactly the API-layer tests.
+
 
                
                     

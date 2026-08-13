@@ -1,17 +1,11 @@
 import pytest
-from httpx import ASGITransport, AsyncClient
-
-from camp_match.app import create_app
 
 
 @pytest.mark.asyncio
-async def test_request_id_header():
-    app = create_app()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response1 = await ac.get("/health")
-        response2 = await ac.get("/health")
+@pytest.mark.api
+async def test_request_id_header(client):
+    response1 = await client.get("/health")
+    response2 = await client.get("/health")
 
     assert "X-Request-ID" in response1.headers
     assert "X-Request-ID" in response2.headers
@@ -23,14 +17,9 @@ async def test_request_id_header():
 
 
 @pytest.mark.asyncio
-async def test_provided_request_id_is_passed_through():
-    app = create_app()
+@pytest.mark.api
+async def test_provided_request_id_is_passed_through(client):
     custom_id = "my-custom-id"
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        headers={"X-Request-ID": custom_id},
-    ) as ac:
-        response = await ac.get("/health")
+    response = await client.get("/health", headers={"X-Request-ID": custom_id})
 
     assert response.headers["X-Request-ID"] == custom_id

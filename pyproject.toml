@@ -23,6 +23,16 @@ ruff = "*"
 mypy = "*"
 import-linter = "*"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: pure logic, no I/O",
+    "integration: real adapters (db, external systems)",
+    "api: HTTP-level tests against the FastAPI app",
+    "architecture: import/dependency boundary checks",
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
