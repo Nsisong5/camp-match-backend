@@ -1,34 +1,36 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Centralized settings loaded from environment/.env, validated at startup, with zero direct os.environ reads anywhere else in the codebase from this point forward.
+Objective: Establish the error-translation pattern at the API boundary now, even though the actual domain/application error hierarchies arrive in Phase 2. This chunk wires the mechanism; Phase 2 fills in the types.
 Files to create:
-src/camp_match/config/settings.py
-.env.example
+src/camp_match/platform/errors/http_error_handlers.py
+Files to modify:
+src/camp_match/app.py — register the handler.
 Implementation instructions:
-In settings.py:
-Python
-from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
+In http_error_handlers.py, define a generic fallback handler for any unhandled Exception:
+import structlog
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+logger = structlog.get_logger()
 
-    app_name: str = "Camp Match API"
-    app_env: str = "local"          # local | test | staging | production
-    debug: bool = False
-    log_level: str = "INFO"
-
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
-    
-     
-Create .env.example documenting every field above with a safe example value. Real .env is created locally by Nsisong and must never be committed (handled in Chunk 1.9).
-Wire get_settings() into app.py via FastAPI Depends(get_settings) for any route/handler that needs it — do not import get_settings() and call it ad hoc deep inside unrelated modules later; always inject it.
-You must not: read os.environ anywhere outside settings.py.
-Tests you must write: tests/unit/config/test_settings.py — asserts defaults load correctly with no .env present, and that overriding via environment variables (e.g. monkeypatching APP_ENV=test) changes Settings().app_env.
+def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(Exception)
+    async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+        logger.error("unhandled_exception", path=str(request.url), error=str(exc))
+        return JSONResponse(
+            status_code=500,
+            content={"error": {"code": "internal_error", "message": "An unexpected error occurred."}},
+        )
+Call register_error_handlers(app) inside create_app() in app.py, right after the app is constructed.
+Response shape {"error": {"code": ..., "message": ...}} is now the stable API error contract for the whole project. Every future error handler (Phase 2 onward) must produce this same shape. Do not invent a different shape later.
+Never include stack traces, exception class names, or file paths in the response body — only in the server-side log.
+Tests you must write: tests/api/test_error_handling.py — add a temporary test-only route that raises a plain Exception, confirm it returns 500 with the exact error shape above, and confirm no traceback text appears in the response body.
 Acceptance criteria:
-poetry run python -c "from camp_match.config.settings import get_settings; print(get_settings())" prints valid settings.
-New tests pass.
-
+New test passes.
+/health still returns 200 (no regression).
+  
+(Already implemented) 
+               
+                    
+  
