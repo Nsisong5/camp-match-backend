@@ -1,0 +1,41 @@
+Do not redesign the architecture.
+Do not invent requirements beyond what a chunk states.
+Do not introduce a library, framework, or tool that isn't named in a chunk or in AI_instructions/.
+Do not modify a module or file outside the current chunk's "Files to create" / "Files to modify" lists.
+Do not bypass a port to reach an implementation directly.
+Do not import another module's internals, or reach into another module's database tables.
+Do not place business logic inside API routers/adapters.
+Do not import FastAPI, SQLAlchemy, or any infrastructure library inside domain code.
+Do not delete or weaken a test to make it pass.
+Do not weaken input validation to make a test pass.
+Do not silently change a public interface (a port, a DTO, an API contract) that a previous chunk defined.
+Do not mark a chunk complete unless every item in its Acceptance Criteria is actually true.
+Do not claim a test passed without having run it and seen it pass.
+Do not fabricate command output.
+Do not refactor code outside the current chunk's scope.
+Do not proceed to the next chunk unless explicitly given it.
+Do not leave an architectural decision you made undocumented.
+When blocked by real ambiguity — not "I'd prefer differently," but "the instructions conflict or don't specify" — stop, do not guess, and report exactly what is ambiguous.
+End of every chunk, always do this (unless the chunk says otherwise):
+Run the full test suite (poetry run pytest) and confirm the new tests from this chunk pass, and nothing else broke.
+Run poetry run ruff check ., poetry run ruff format --check ., and poetry run mypy src and fix anything the chunk's own new code triggers.
+Stage and commit your changes with a Conventional Commits message: type(scope): subject, e.g. feat(phase1): add FastAPI skeleton and health endpoint. Types: feat, fix, chore, docs, test, refactor, build, ci.
+Update AI_state/CURRENT_TASK.md to point at the next chunk, AI_state/PROGRESS.md to check off what you finished, AI_state/COMPLETED_WORK.md to add a one-line entry, and AI_state/SESSION_HANDOFF.md with the Completion Report below. (Chunks before 1.10 obviously can't do this yet — start doing it from Chunk 1.10 onward.)
+Produce a Completion Report in your reply with exactly these fields: What was completed / Files created / Files modified / Tests written / Tests run and result / Lint & type-check result / Known issues or deviations / Exact recommended next chunk.
+
+
+Objective: Create the top-level directory skeleton. No code, no dependencies yet.
+Preconditions: You have a project directory to work in (empty or near-empty), with git available.
+Files to create:
+README.md — one paragraph: project name, one-line description ("Camp Match backend — modular monolith, hexagonal architecture"), "under construction" note.
+.gitignore — create empty; populated in Chunk 1.9.
+Directories (with .gitkeep in any that would otherwise be empty): src/camp_match/, tests/unit/, tests/integration/, tests/api/, tests/architecture/, migrations/, AI_instructions/, AI_state/, docs/modules/, docs/api/.
+Implementation instructions:
+If no git repository exists yet, run git init.
+Create the directories and files listed above.
+Confirm git status shows the new structure as untracked.
+Tests you must write: None — no code exists yet.
+Acceptance criteria:
+git status shows the full directory tree above.
+No .py files exist yet.
+Completion report: Follow the Standing Completion Report Protocol, but skip the AI_state update step (those files don't exist until Chunk 1.10) — just commit with chore(phase1): initialize repository structure
