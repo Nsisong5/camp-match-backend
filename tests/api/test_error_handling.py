@@ -25,9 +25,7 @@ async def test_unexpected_error_handler():
     # Maybe I can just create the app *in* the test and pass it to the fixture?
     # The fixture is defined in conftest.py.
 
-    pytest.skip(
-        "Refactoring error handling test to shared fixture is complex with current design."
-    )
+    pytest.skip("Refactoring error handling test to shared fixture is complex with current design.")
 
 
 @pytest.mark.asyncio

@@ -29,44 +29,37 @@ Produce a Completion Report in your reply with exactly these fields: What was co
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Formalize the test layers, markers, and shared fixtures so every later chunk just adds tests into an existing, working harness.
-Files to create:
-tests/__init__.py, tests/unit/__init__.py, tests/integration/__init__.py, tests/api/__init__.py, tests/architecture/__init__.py
-tests/conftest.py
+Objective: Wire Ruff and mypy with real configuration, not defaults.
 Files to modify:
-pyproject.toml — add [tool.pytest.ini_options].
+pyproject.toml — add [tool.ruff] and [tool.mypy].
 Implementation instructions:
-In pyproject.toml:
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-asyncio_mode = "auto"
-markers = [
-    "unit: pure logic, no I/O",
-    "integration: real adapters (db, external systems)",
-    "api: HTTP-level tests against the FastAPI app",
-    "architecture: import/dependency boundary checks",
-]
+Ruff config:
+[tool.ruff]
+line-length = 100
+target-version = "py312"
 
-In tests/conftest.py, define a reusable fixture:
-import pytest
-from httpx import ASGITransport, AsyncClient
-from camp_match.app import create_app
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
-@pytest.fixture
-async def client():
-    app = create_app()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-        
-Refactor tests/api/test_health.py, tests/api/test_error_handling.py, and tests/api/test_request_id.py from earlier chunks to use this shared client fixture instead of constructing their own client, to remove duplication.
-Add commands to README.md: run all tests poetry run pytest; run one layer poetry run pytest -m unit (also integration, api, architecture); run a single file poetry run pytest tests/api/test_health.py.
-Tests you must write: none new — this chunk is about consolidating the harness. Confirm all existing tests still pass after the refactor.
+[tool.ruff.format]
+quote-style = "double"
+mypy config
+[tool.mypy]
+python_version = "3.12"
+strict = true
+exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+(strict = true applies to src/camp_match only, via the exclude pattern — tests are relaxed.)
+3. Run poetry run ruff check ., poetry run ruff format ., poetry run mypy src and fix every finding in code written so far (Chunks 1.0–1.7).
+4. Add exact commands to README.md under a "Code Quality" heading.
 Acceptance criteria:
-poetry run pytest passes, all previously-written tests included.
-poetry run pytest -m api runs exactly the API-layer tests.
+poetry run ruff check . exits 0.
+poetry run mypy src exits 0.
+poetry run pytest still passes.
 
-
-               
+                      
                     
   

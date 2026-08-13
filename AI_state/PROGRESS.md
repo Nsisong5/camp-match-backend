@@ -7,3 +7,4 @@
 - [x] Chunk 1.5: Error Handlers
 - [x] Chunk 1.6: Logging & Middleware
 - [x] Chunk 1.7: Test Harness
+- [x] Chunk 1.8: Static Analysis

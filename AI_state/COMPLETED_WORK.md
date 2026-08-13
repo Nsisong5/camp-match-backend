@@ -7,3 +7,4 @@
 - [x] Global error handling (Chunk 1.5)
 - [x] Logging & middleware (Chunk 1.6)
 - [x] Consolidated test harness (Chunk 1.7)
+- [x] Static analysis configuration (Chunk 1.8)
