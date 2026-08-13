@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "camp-match"
+version = "0.1.0"
+description = "Camp Match backend — modular monolith, hexagonal architecture"
+authors = ["SoTrick Engineering"]
+readme = "README.md"
+packages = [{include = "camp_match", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+pydantic = "*"
+pydantic-settings = "*"
+structlog = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-asyncio = "*"
+pytest-cov = "*"
+httpx = "*"
+ruff = "*"
+mypy = "*"
+import-linter = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
