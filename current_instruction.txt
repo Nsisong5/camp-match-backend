@@ -1,3 +1,5 @@
+CODING INSTRUCTIONS 
+
 Do not redesign the architecture.
 Do not invent requirements beyond what a chunk states.
 Do not introduce a library, framework, or tool that isn't named in a chunk or in AI_instructions/.
@@ -24,18 +26,31 @@ Update AI_state/CURRENT_TASK.md to point at the next chunk, AI_state/PROGRESS.md
 Produce a Completion Report in your reply with exactly these fields: What was completed / Files created / Files modified / Tests written / Tests run and result / Lint & type-check result / Known issues or deviations / Exact recommended next chunk.
 
 
-Objective: Create the top-level directory skeleton. No code, no dependencies yet.
-Preconditions: You have a project directory to work in (empty or near-empty), with git available.
+
+EXECUTE THE BELOW INSTRUCTIONS 
+
+
+
+Objective: Lay out the internal src/camp_match/ package structure that every later phase builds into. No behavior yet — just empty packages with docstrings explaining each folder's responsibility.
 Files to create:
-README.md — one paragraph: project name, one-line description ("Camp Match backend — modular monolith, hexagonal architecture"), "under construction" note.
-.gitignore — create empty; populated in Chunk 1.9.
-Directories (with .gitkeep in any that would otherwise be empty): src/camp_match/, tests/unit/, tests/integration/, tests/api/, tests/architecture/, migrations/, AI_instructions/, AI_state/, docs/modules/, docs/api/.
+src/camp_match/__init__.py
+src/camp_match/config/__init__.py
+src/camp_match/shared_kernel/__init__.py
+src/camp_match/shared_kernel/domain/__init__.py
+src/camp_match/shared_kernel/application/__init__.py
+src/camp_match/platform/__init__.py
+src/camp_match/platform/logging/__init__.py
+src/camp_match/platform/errors/__init__.py
+src/camp_match/platform/db/__init__.py
+src/camp_match/modules/__init__.py
+
 Implementation instructions:
-If no git repository exists yet, run git init.
-Create the directories and files listed above.
-Confirm git status shows the new structure as untracked.
-Tests you must write: None — no code exists yet.
+Create each file above. Each __init__.py must contain a one-line module docstring stating that package's single responsibility (e.g. """Cross-cutting technical infrastructure: logging, error translation, database session lifecycle. Contains no business logic.""" for platform/).
+modules/__init__.py docstring must state: this package holds one subpackage per business module (Identity, Housing, Booking, …); nothing lives directly here; it is empty until the first business module is implemented after Phase 3.
+shared_kernel/domain/__init__.py docstring must state: only domain-independent, infrastructure-free abstractions (IDs, errors, clock, events) belong here — see AI_instructions/02_ARCHITECTURE_RULES.md.
+Dependencies you may use: none — this chunk is structural only.
+Tests you must write: tests/unit/test_package_structure.py — asserts each of the above modules is importable (importlib.import_module) and raises no error.
 Acceptance criteria:
-git status shows the full directory tree above.
-No .py files exist yet.
-Completion report: Follow the Standing Completion Report Protocol, but skip the AI_state update step (those files don't exist until Chunk 1.10) — just commit with chore(phase1): initialize repository structure
+poetry run python -c "import camp_match, camp_match.config, camp_match.shared_kernel, camp_match.shared_kernel.domain, camp_match.shared_kernel.application, camp_match.platform, camp_match.platform.logging, camp_match.platform.errors, camp_match.platform.db, camp_match.modules" succeeds.
+The new test passes.
+
