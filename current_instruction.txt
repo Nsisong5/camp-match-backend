@@ -1,36 +1,23 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Establish the error-translation pattern at the API boundary now, even though the actual domain/application error hierarchies arrive in Phase 2. This chunk wires the mechanism; Phase 2 fills in the types.
+Objective: Structured JSON logging with request correlation IDs, wired at startup.
 Files to create:
-src/camp_match/platform/errors/http_error_handlers.py
+src/camp_match/platform/logging/setup.py
+src/camp_match/platform/logging/middleware.py
 Files to modify:
-src/camp_match/app.py — register the handler.
+src/camp_match/app.py — call logging setup, register middleware.
 Implementation instructions:
-In http_error_handlers.py, define a generic fallback handler for any unhandled Exception:
-import structlog
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-
-logger = structlog.get_logger()
-
-def register_error_handlers(app: FastAPI) -> None:
-    @app.exception_handler(Exception)
-    async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-        logger.error("unhandled_exception", path=str(request.url), error=str(exc))
-        return JSONResponse(
-            status_code=500,
-            content={"error": {"code": "internal_error", "message": "An unexpected error occurred."}},
-        )
-Call register_error_handlers(app) inside create_app() in app.py, right after the app is constructed.
-Response shape {"error": {"code": ..., "message": ...}} is now the stable API error contract for the whole project. Every future error handler (Phase 2 onward) must produce this same shape. Do not invent a different shape later.
-Never include stack traces, exception class names, or file paths in the response body — only in the server-side log.
-Tests you must write: tests/api/test_error_handling.py — add a temporary test-only route that raises a plain Exception, confirm it returns 500 with the exact error shape above, and confirm no traceback text appears in the response body.
+setup.py: a configure_logging(settings: Settings) -> None function that configures structlog to output JSON, with log level from settings.log_level.
+middleware.py: an ASGI middleware (or FastAPI @app.middleware("http")) that generates a request_id = str(uuid4()) per request, binds it into structlog.contextvars for the duration of the request, adds it as response header X-Request-ID, and clears the context after the response.
+In app.py, call configure_logging(get_settings()) and register the middleware inside create_app().
+Update http_error_handlers.py's log call to rely on the bound request_id context (no code change needed if using structlog.contextvars correctly — verify it shows up automatically in the log line).
+You must not: log settings wholesale (could contain secrets later), passwords, tokens, or full request bodies. Log only structured fields you explicitly name.
+Tests you must write: tests/api/test_request_id.py — confirms every response (including /health) carries an X-Request-ID header, and two different requests get two different IDs.
 Acceptance criteria:
 New test passes.
-/health still returns 200 (no regression).
-  
-(Already implemented) 
+Running the app and hitting /health prints a JSON log line containing request_id.
+
                
                     
   
