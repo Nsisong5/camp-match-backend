@@ -1,40 +1,34 @@
 
-EXECUTE THE BELOW INSTRUCTIONS 
+EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: A minimal, thin FastAPI app with one health endpoint. No business logic.
+Objective: Centralized settings loaded from environment/.env, validated at startup, with zero direct os.environ reads anywhere else in the codebase from this point forward.
 Files to create:
-src/camp_match/app.py
-src/camp_match/main.py
+src/camp_match/config/settings.py
+.env.example
 Implementation instructions:
-In app.py, define an application factory:
+In settings.py:
+Python
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from fastapi import FastAPI
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Camp Match API", version="0.1.0")
+    app_name: str = "Camp Match API"
+    app_env: str = "local"          # local | test | staging | production
+    debug: bool = False
+    log_level: str = "INFO"
 
-    @app.get("/health", tags=["infrastructure"])
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
-
-    return app
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
     
-(This will grow in later chunks — lifespan, middleware, exception handlers, routers — but stays a thin composition point. Never add business logic directly in app.py.)
-2. In main.py:
-import uvicorn
-from camp_match.app import create_app
-
-app = create_app()
-
-if __name__ == "__main__":
-    uvicorn.run("camp_match.main:app", host="0.0.0.0", port=8000, reload=True)
-    
-You must not: put configuration loading, database setup, or route business logic in either file — those arrive in later chunks via composition, not by growing these files with unrelated concerns.
-Tests you must write: tests/api/test_health.py — using httpx.AsyncClient with ASGITransport(app=create_app()), GET /health returns 200 and body {"status": "ok"}.
+     
+Create .env.example documenting every field above with a safe example value. Real .env is created locally by Nsisong and must never be committed (handled in Chunk 1.9).
+Wire get_settings() into app.py via FastAPI Depends(get_settings) for any route/handler that needs it — do not import get_settings() and call it ad hoc deep inside unrelated modules later; always inject it.
+You must not: read os.environ anywhere outside settings.py.
+Tests you must write: tests/unit/config/test_settings.py — asserts defaults load correctly with no .env present, and that overriding via environment variables (e.g. monkeypatching APP_ENV=test) changes Settings().app_env.
 Acceptance criteria:
-poetry run uvicorn camp_match.main:app --reload starts without error.
-GET http://localhost:8000/health returns 200 {"status":"ok"}.
-The new test passes.    
- 
-
+poetry run python -c "from camp_match.config.settings import get_settings; print(get_settings())" prints valid settings.
+New tests pass.
 
