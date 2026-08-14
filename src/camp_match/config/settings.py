@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     app_env: str = "local"  # local | test | staging | production
     debug: bool = False
     log_level: str = "INFO"
+    database_url: str = "postgresql+asyncpg://jasper:what1234@localhost:5432/camp_match_dev"
+    database_pool_size: int = 5
+    database_echo: bool = False
 
 
 @lru_cache

@@ -1,108 +1,151 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-PHASE 3 — DATABASE STRATEGY
-
-CHUNK 3.0 — PostgreSQL Setup
-Objective: A local PostgreSQL instance running natively inside Termux — no Docker. Docker requires kernel namespace/cgroup features that standard, non-rooted Android/Termux does not expose, so this environment uses Termux's own postgresql package directly.
-Architectural context: ADR-011 (revised) — Postgres runs as a native Termux process, started and stopped explicitly per session, since Termux has no init system to manage it automatically.
-Files to create:
-scripts/db_bootstrap.sh — one-time setup (install, initdb, create role/database).
-scripts/db_start.sh — start the server.
-scripts/db_stop.sh — stop the server.
-Files to modify:
-.env.example — add DATABASE_URL.
-.gitignore — ensure the Postgres data directory is not committed (it lives under Termux's $PREFIX, outside the repo, so no repo-level ignore entry is actually needed — confirm this and skip adding one if so).
-Implementation instructions:
-scripts/db_bootstrap.sh (run once):
-Bash
-#!/data/data/com.termux/files/usr/bin/bash
-set -e
-pkg install -y postgresql
-mkdir -p "$PREFIX/var/lib/postgresql"
-initdb "$PREFIX/var/lib/postgresql"
-pg_ctl -D "$PREFIX/var/lib/postgresql" -l "$PREFIX/var/lib/postgresql/server.log" start
-sleep 2
-createuser -P -s -e camp_match      # you will be prompted; use password "camp_match" for local dev
-createdb -O camp_match camp_match_dev
-pg_ctl -D "$PREFIX/var/lib/postgresql" stop
-echo "Bootstrap complete. Use scripts/db_start.sh to start the server."
-
-scripts/db_start.sh
-
-#!/data/data/com.termux/files/usr/bin/bash
-pg_ctl -D "$PREFIX/var/lib/postgresql" -l "$PREFIX/var/lib/postgresql/server.log" start
-                
-scripts/db_stop.sh
-#!/data/data/com.termux/files/usr/bin/bash
-pg_ctl -D "$PREFIX/var/lib/postgresql" stop
-Make all three executable (chmod +x scripts/db_*.sh).
-4. Run scripts/db_bootstrap.sh once. Confirm psql -U camp_match -d camp_match_dev -c "SELECT 1;" returns a row.
-5. Add to .env.example:
-
-DATABASE_URL=postgresql+asyncpg://camp_match:camp_match@localhost:5432/camp_match_dev
-
-Standard port 5432 is fine here — there is no host/container port mapping to worry about, since everything runs on the same Termux filesystem.
-6. Check $PREFIX/var/lib/postgresql/postgresql.conf — confirm listen_addresses includes localhost (Termux's default initdb usually sets this already; if it's commented out or set to nothing, uncomment and set it to 'localhost' so SQLAlchemy/asyncpg can connect over TCP rather than only a Unix socket).
-7. Document in README.md under "Database (Termux)": run scripts/db_bootstrap.sh once after cloning; run scripts/db_start.sh at the start of every dev/test session and scripts/db_stop.sh when done; the server does not survive a Termux/device restart automatically — you always start it manually. If you're running a long session, consider termux-wake-lock (from the Termux:API add-on) so Android doesn't suspend Termux and kill the server mid-session.
-You must not: add a docker-compose.yml or any Docker reference back into the project — this environment cannot run it.
-Acceptance criteria:
-scripts/db_start.sh starts the server with no error; pg_isready -h localhost -p 5432 reports accepting connections.
-psql -U camp_match -d camp_match_dev -c "SELECT 1;" succeeds.
-scripts/db_stop.sh stops it cleanly
-
-CHUNK 3.1 — SQLAlchemy Setup
-
-Objective: Add SQLAlchemy (async) and asyncpg as dependencies; establish the declarative base with a real naming convention.
-Architectural context: ADR-004.
-Files to modify:
-pyproject.toml — add runtime deps sqlalchemy (>=2.0), asyncpg; dev dep aiosqlite is not needed — tests run against real Postgres per ADR-013, not SQLite.
-Files to create:
-src/camp_match/platform/db/base.py
-Implementation instructions:
-poetry add sqlalchemy asyncpg, then poetry add --group dev alembic (Alembic is dev-only tooling, not a runtime dependency of the deployed app).
-platform/db/base.py:
-
-from sqlalchemy.orm import DeclarativeBase
-
-NAMING_CONVENTION = {
-    "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s",
-}
-
-class Base(DeclarativeBase):
-    metadata_naming_convention = NAMING_CONVENTION
-
-        
-apply NAMING_CONVENTION via metadata = MetaData(naming_convention=NAMING_CONVENTION) as a class attribute on Base, per current SQLAlchemy 2.0 declarative API — the snippet above shows the convention dict; wire it exactly as SQLAlchemy 2.0's documented pattern for declarative naming conventions requires.)
-3. This Base is the only declarative base for the entire project — every module's ORM models (once modules exist) inherit from this one, imported from camp_match.platform.db.base. Do not create a second base.
-You must not: define any table/model yet — no business tables exist until the Identity module.
-Tests you must write: tests/unit/platform/test_db_base.py — confirms Base.metadata.naming_convention (or equivalent) contains the exact keys above.
-Acceptance criteria: new test passes; mypy clean.
-
-        
-CHUNK 3.2 — Database Configuration
-Objective: Extend Settings with database configuration.
-Files to modify:
-src/camp_match/config/settings.py
-Implementation instructions:
-Add to the Settings class from Chunk 1.4:
-
-database_url: str = "postgresql+asyncpg://camp_match:camp_match@localhost:5433/camp_match_dev"
-    database_pool_size: int = 5
-    database_echo: bool = False
-    
+CHUNK 3.3 — Session Lifecycle
     
                                                                                                                                                                                                 
-Update .env.example to include DATABASE_POOL_SIZE and DATABASE_ECHO alongside the DATABASE_URL added in Chunk 3.0.
-Tests you must write: extend tests/unit/config/test_settings.py to confirm database_url overrides correctly via environment variable.
-Acceptance criteria: new/updated tests pass.            
+Objective: Engine and session factory, with a defined creation/teardown lifecycle tied to the FastAPI app's lifespan — not created ad hoc per request.
+Files to create:
+src/camp_match/platform/db/session.py
+Files to modify:
+src/camp_match/app.py — add a lifespan context manager that creates the engine at startup and disposes it at shutdown.
+Implementation instructions:
+platform/db/session.py:
+
+from __future__ import annotations
+from collections.abc import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from camp_match.config.settings import Settings
+
+def create_engine(settings: Settings) -> AsyncEngine:
+    return create_async_engine(
+        settings.database_url,
+        pool_size=settings.database_pool_size,
+        echo=settings.database_echo,
+    )
+
+def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(bind=engine, expire_on_commit=False)
+          
+app.py changes:
+Switch create_app() to use FastAPI's lifespan parameter:
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from camp_match.config.settings import get_settings
+from camp_match.platform.db.session import create_engine, create_session_factory
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    engine = create_engine(settings)
+    app.state.db_engine = engine
+    app.state.db_session_factory = create_session_factory(engine)
+    yield
+    await engine.dispose()
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="Camp Match API", version="0.1.0", lifespan=lifespan)
+    ...
     
+Add a FastAPI dependency get_db_session (in platform/db/session.py) that yields an AsyncSession from request.app.state.db_session_factory and closes it after the request — without auto-committing. Committing is the responsibility of the Unit of Work (Chunk 3.4), invoked explicitly by whichever use case needs a transaction — never implicitly by the dependency itself:
+    
+async def get_db_session(request: "Request") -> AsyncGenerator[AsyncSession, None]:
+    session_factory = request.app.state.db_session_factory
+    async with session_factory() as session:
+        yield session
+        
+Business rules: the domain layer never sees AsyncSession. The application layer only sees it through the UnitOfWork port from Chunk 2.5. Only platform/db/ and per-module adapters/persistence/ code may import SQLAlchemy directly.
+Tests you must write: tests/integration/platform/test_db_session.py — marked @pytest.mark.integration, requires the local Termux Postgres running (scripts/db_start.sh): confirms create_engine + create_session_factory produce a working session that can execute SELECT 1.
+Acceptance criteria: with the Postgres server started (scripts/db_start.sh), the new integration test passes; app still starts and /health still responds.
+
+CHUNK 3.4 — Repository Foundation (Unit of Work
+Objective: A concrete SqlAlchemyUnitOfWork satisfying the UnitOfWork port defined in Phase 2 Chunk 2.5 — exactly, not a redesign of it.
+Files to create:
+src/camp_match/platform/db/unit_of_work.py
+Implementation instructions:
+
+from __future__ import annotations
+from sqlalchemy.ext.asyncio import AsyncSession
+
+class SqlAlchemyUnitOfWork:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def __aenter__(self) -> "SqlAlchemyUnitOfWork":
+        return self
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        if exc_type is not None:
+            await self.rollback()
+
+    async def commit(self) -> None:
+        await self._session.commit()
+
+    async def rollback(self) -> None:
+        await self._session.rollback()
+
+    @property
+    def session(self) -> AsyncSession:
+        """Exposed so a concrete repository (built alongside its owning module) can execute queries within this unit of work's transaction. Only that module's own repository implementation should use this — never a use case directly."""
+        return self._session
+        
+Add a FastAPI dependency get_unit_of_work in the same file that composes get_db_session → SqlAlchemyUnitOfWork, for use by future module composition roots.
+Repository pattern conventions (document only — do not implement a generic repository class): each module defines its own repository interface in its application/ports/outbound.py (e.g. ListingRepository with methods meaningful to Housing specifically — find_by_id, find_published_near, etc. — not a generic save/get/delete CRUD interface shared across modules), and its own implementation in adapters/persistence/repository.py, constructed with a Session or the UnitOfWork. Do not create a shared GenericRepository[T] base class — that pattern hides module-specific query needs behind a false abstraction and is exactly the kind of shared-kernel sprawl Phase 2 was designed to avoid. Add this paragraph to AI_instructions/07_DATABASE_RULES.md.
+Tests you must write: tests/integration/platform/test_unit_of_work.py (marked integration) — a change made inside async with uow: and committed is visible in a subsequent query; a change made and then an exception raised inside the block results in nothing being persisted (rollback works).
+Acceptance criteria: new tests pass against the running local Termux Postgres (scripts/db_start.sh).
+
+CHUNK 3.5 — Migration Infrastructure
+        
+Objective: Alembic wired to the async engine and to Base.metadata, driven by Settings rather than a hardcoded URL.
+Files to create:
+alembic.ini
+migrations/env.py
+migrations/script.py.mako
+migrations/versions/ (empty directory with .gitkeep — no migrations exist yet, since no tables exist yet)
+Implementation instructions:
+Run poetry run alembic init -t async migrations to scaffold the async template, then adjust:
+alembic.ini: remove the hardcoded sqlalchemy.url line (or leave it blank) — the URL comes from Settings at runtime, never from this file, so local/test/staging URLs never need editing this file.
+migrations/env.py: import from camp_match.config.settings import get_settings and from camp_match.platform.db.base import Base; set target_metadata = Base.metadata; read the URL via get_settings().database_url inside run_migrations_online/run_migrations_offline instead of config.get_main_option("sqlalchemy.url").
+Document exact commands in README.md:
+Create a migration: poetry run alembic revision --autogenerate -m "message"
+Apply migrations: poetry run alembic upgrade head
+Roll back one step: poetry run alembic downgrade -1
+Check current version: poetry run alembic current
+Since no ORM models exist yet, poetry run alembic revision --autogenerate -m "initial" should generate an empty migration (no op.create_table calls) — confirm this is what happens; do not hand-write a migration with fake tables.
+Acceptance criteria:
+poetry run alembic upgrade head runs cleanly against the local Termux Postgres database (even with zero real migrations, the alembic_version tracking table gets created).
+poetry run alembic current reports the head revision.
+
+CHUNK 3.6 — Test Database
+
+Objective: Fast, isolated database tests: a dedicated camp_match_test database, migrated once per test session, with each individual test wrapped in a transaction that's rolled back afterward so tests never see each other's data.
+Architectural context: ADR-013.
+Files to modify:
+tests/conftest.py
+Implementation instructions:
+Add a session-scoped fixture that ensures camp_match_test exists (connect to the default camp_match_dev/postgres admin database, attempt CREATE DATABASE camp_match_test, catch/ignore the "already exists" error), then runs Base.metadata.create_all (or invokes Alembic programmatically) against it once per test session.
+Add a function-scoped fixture db_session that: opens a connection to camp_match_test, begins an outer transaction, binds an AsyncSession to that connection, yields the session, then rolls back the outer transaction and closes the connection — so nothing committed inside a test (even via nested session.commit() calls inside a UnitOfWork) survives past that test. (Note to Gemini: this requires using SQLAlchemy's join-a-session-to-an-external-transaction pattern — connection.begin() + AsyncSession(bind=connection) + a session.begin_nested()/savepoint restarted after each flush via a sync_session event listener, per SQLAlchemy 2.0's documented async "joining a session to an external transaction" recipe. Follow that documented recipe exactly rather than improvising a variant.)
+Point DATABASE_URL for the test run at camp_match_test, not camp_match_dev — either via a .env.test loaded when APP_ENV=test, or by having the fixture override the URL directly; pick whichever is simpler to implement correctly and document your choice in the Completion Report.
+Re-tag tests/integration/platform/test_db_session.py and test_unit_of_work.py (from Chunks 3.3–3.4) to use this new db_session fixture instead of hitting camp_match_dev directly, if they weren't already isolated this way.
+Tests you must write: tests/integration/platform/test_db_isolation.py — Test A inserts a row and commits inside the db_session fixture; Test B (any test, run after A) queries and confirms that row does not exist — proving isolation actually works, not just that the fixture runs without error.
+Acceptance criteria:
+poetry run pytest -m integration passes twice in a row with no manual cleanup between runs (proving isolation, not just first-run luck).
+camp_match_dev (the "real" local dev database) is untouched by the test run — confirm by checking it has no test data afterward.
 
 
+CHUNK 3.7 — Database Conventions
+
+Objective: Finalize AI_instructions/07_DATABASE_RULES.md with the concrete conventions this phase established, so every future module follows them without re-deriving them.
+Files to modify:
+AI_instructions/07_DATABASE_RULES.md
+Implementation instructions: append (do not remove the Phase 2/earlier content):
+Naming: the NAMING_CONVENTION dict from Chunk 3.1, verbatim — every constraint/index in every future table must follow it automatically via Base.
+Timestamps: created_at/updated_at audit columns use server_default=func.now() (and server_onupdate/an onupdate=func.now() Python-side default for updated_at) — timezone-aware (TIMESTAMP(timezone=True)), never naive. Business-meaningful timestamps (expirations, scheduling) come from the injected Clock, not from the database or from datetime.now() directly — restated from Chunk 2.3, now with the concrete SQLAlchemy column type to use.
+Soft deletion: not applied by default to every table. Each future module must explicitly decide per-entity: hard delete, soft delete (deleted_at: datetime | None), or a status/lifecycle field (e.g. ListingStatus.ARCHIVED) — and document the choice in that module's docs/modules/<name>.md.
+Module persistence ownership: restated from Phase 2 handoff Part 50 — one module, one set of tables; cross-module reads happen through ports or read models, never a direct join/query into another module's table.
+Migrations: every schema change ships as an Alembic migration generated via --autogenerate and hand-reviewed before applying — autogenerate output is a draft, not a guarantee; always read the generated migration before running it.
+Acceptance criteria: file updated; no code changes in this chunk.
 
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 

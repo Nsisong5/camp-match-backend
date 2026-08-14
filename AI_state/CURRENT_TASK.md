@@ -1,2 +1,2 @@
 # Current Task
-Next chunk: 3.0 (Database and Persistence preparation)
+Next chunk: 3.2 (Database Models and Repositories)
