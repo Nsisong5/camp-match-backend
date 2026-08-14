@@ -1,59 +1,71 @@
-CODING INSTRUCTIONS 
-
-Do not redesign the architecture.
-Do not invent requirements beyond what a chunk states.
-Do not introduce a library, framework, or tool that isn't named in a chunk or in AI_instructions/.
-Do not modify a module or file outside the current chunk's "Files to create" / "Files to modify" lists.
-Do not bypass a port to reach an implementation directly.
-Do not import another module's internals, or reach into another module's database tables.
-Do not place business logic inside API routers/adapters.
-Do not import FastAPI, SQLAlchemy, or any infrastructure library inside domain code.
-Do not delete or weaken a test to make it pass.
-Do not weaken input validation to make a test pass.
-Do not silently change a public interface (a port, a DTO, an API contract) that a previous chunk defined.
-Do not mark a chunk complete unless every item in its Acceptance Criteria is actually true.
-Do not claim a test passed without having run it and seen it pass.
-Do not fabricate command output.
-Do not refactor code outside the current chunk's scope.
-Do not proceed to the next chunk unless explicitly given it.
-Do not leave an architectural decision you made undocumented.
-When blocked by real ambiguity — not "I'd prefer differently," but "the instructions conflict or don't specify" — stop, do not guess, and report exactly what is ambiguous.
-End of every chunk, always do this (unless the chunk says otherwise):
-Run the full test suite (poetry run pytest) and confirm the new tests from this chunk pass, and nothing else broke.
-Run poetry run ruff check ., poetry run ruff format --check ., and poetry run mypy src and fix anything the chunk's own new code triggers.
-Stage and commit your changes with a Conventional Commits message: type(scope): subject, e.g. feat(phase1): add FastAPI skeleton and health endpoint. Types: feat, fix, chore, docs, test, refactor, build, ci.
-Update AI_state/CURRENT_TASK.md to point at the next chunk, AI_state/PROGRESS.md to check off what you finished, AI_state/COMPLETED_WORK.md to add a one-line entry, and AI_state/SESSION_HANDOFF.md with the Completion Report below. (Chunks before 1.10 obviously can't do this yet — start doing it from Chunk 1.10 onward.)
-Produce a Completion Report in your reply with exactly these fields: What was completed / Files created / Files modified / Tests written / Tests run and result / Lint & type-check result / Known issues or deviations / Exact recommended next chunk.
-
-
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Populate .gitignore per ADR-012, and document the commit convention.
-Files to modify:
-.gitignore
-README.md — add "Contributing / Commit Convention" section.
-Implementation instructions:
-Populate .gitignore with at minimum:
-.venv/
-__pycache__/
-*.pyc
-.env
-.mypy_cache/
-.ruff_cache/
-.pytest_cache/
-.coverage
-htmlcov/
-dist/
-build/
-AI_state/
-Per ADR-012, AI_state/ is excluded from the public repo; AI_instructions/ and docs/ are not in this list — they get committed.
-2. If AI_state/ files were accidentally committed earlier (they shouldn't have been, since Chunk 1.10 hasn't run yet), that's fine — this chunk runs before AI_state exists.
-3. Document the Conventional Commits convention in README.md (types: feat, fix, chore, docs, test, refactor, build, ci) — this simply documents the Standing Instruction already in force since Chunk 1.0.
-Acceptance criteria:
-git status after creating a dummy file under AI_state/ shows it as ignored.
-.env (if present locally) does not appear in git status.
+Objective: Create the real, populated AI_instructions/ and AI_state/ files. This is the most important chunk in Phase 1 — from here on, you read these files at the start of every session instead of relying on chat history.
+Files to create (AI_instructions — commit these):
+AI_instructions/00_START_HERE.md
+AI_instructions/01_PROJECT_CONSTITUTION.md
+AI_instructions/02_ARCHITECTURE_RULES.md
+AI_instructions/03_MODULE_RULES.md
+AI_instructions/04_CODING_RULES.md
+AI_instructions/05_TESTING_RULES.md
+AI_instructions/06_SECURITY_RULES.md
+AI_instructions/07_DATABASE_RULES.md
+AI_instructions/08_API_RULES.md
+AI_instructions/09_DOCUMENTATION_RULES.md
+AI_instructions/10_SESSION_PROTOCOL.md
+AI_instructions/11_DEFINITION_OF_DONE.md
+Files to create (AI_state — gitignored, still create them on disk):
+AI_state/CURRENT_STATE.md, CURRENT_TASK.md, PROGRESS.md, COMPLETED_WORK.md, IN_PROGRESS.md, KNOWN_ISSUES.md, ARCHITECTURE_STATE.md, DATABASE_STATE.md, API_STATE.md, TEST_STATE.md, DECISIONS.md, SESSION_HANDOFF.md
+Implementation instructions — write exactly this content into each file (you may reformat lightly, but do not omit substance):
+00_START_HERE.md:
+# Start Here
 
+You are Gemini CLI, implementing the Camp Match backend. Before touching any code this session:
+1. Read every file in this AI_instructions/ folder (01 through 11), in order.
+2. Read AI_state/CURRENT_STATE.md, then CURRENT_TASK.md, then PROGRESS.md.
+3. Read the module documentation (docs/modules/) relevant to what you're about to touch, if any.
+4. Only then begin the task named in CURRENT_TASK.md.
+Do not begin coding just because a human says "continue" — confirm what CURRENT_TASK.md actually authorizes first.
+
+01_PROJECT_CONSTITUTION.md: restate Part 3–5 of the Chief Engineer handoff concisely — product description, the 13 MVP modules list, and the sentence "advanced functionality is not built merely because it exists in the long-term vision."
+02_ARCHITECTURE_RULES.md: restate Parts 6–17 concisely — modular monolith (not microservices, but microservice-ready boundaries), the layer list (domain/application/ports/adapters/infrastructure), the dependency rule (dependencies point inward), and the BAD/GOOD import examples from Part 7 and Part 11.
+03_MODULE_RULES.md: the module folder template —
+src/camp_match/modules/<module_name>/
+├── domain/            (entities, value_objects, errors, events — no framework imports)
+├── application/
+│   ├── ports/          (inbound.py, outbound.py — interfaces only)
+│   └── use_cases/
+├── adapters/
+│   ├── api/            (router.py, schemas.py, dependencies.py)
+│   ├── persistence/    (models.py, repository.py)
+│   └── external/        (if the module needs one, e.g. payment/email adapters)
+
+Tests live centrally, mirroring this: tests/unit/<module_name>/, tests/integration/<module_name>/, tests/api/<module_name>/. Module docs live at docs/modules/<module_name>.md.
+04_CODING_RULES.md: the 18 "rules you must never break" from Section D of this specification, verbatim, plus the exact Ruff/mypy commands from Chunk 1.8.
+05_TESTING_RULES.md: the four test layers and their markers (unit, integration, api, architecture) with one sentence each on what belongs in each, plus the exact pytest commands from Chunk 1.7.
+06_SECURITY_RULES.md: restate Part 18's list, plus: never log passwords, tokens, payment credentials, or full identity documents (established in Chunk 1.6); all authentication/authorization mechanisms are defined when the Identity & Security modules are built, not before.
+07_DATABASE_RULES.md: one module owns one set of tables; no module queries another module's tables directly; naming conventions (to be filled precisely in Phase 3 Chunk 3.1); migrations only via Alembic, never manual schema edits; audit timestamps (created_at/updated_at) may use DB server defaults, but business-meaningful timestamps that affect domain logic must come from the injected Clock port, not datetime.now().
+08_API_RULES.md: routers are thin — no business logic, only request parsing → calling an inbound port → serializing the response; all business endpoints live under /api/v1/...; infrastructure endpoints (like /health) stay unversioned; error response shape is always {"error": {"code": ..., "message": ...}}.
+09_DOCUMENTATION_RULES.md: restate the Part 26 module-documentation checklist (purpose, responsibilities, non-responsibilities, domain model, use cases, ports, adapters, persistence, API endpoints, events, dependencies, security, configuration, testing, known limitations, extension points, future extraction considerations); note that frontend-facing API documentation is produced by Claude, not by you, after each module — you do not need to write it, but you must make sure your API endpoints match what was specified so that documentation stays accurate.
+10_SESSION_PROTOCOL.md: the startup checklist from 00_START_HERE.md repeated in full, plus the end-of-session checklist from Section D of this specification (run tests, run lint/type-check, commit, update AI_state files, produce the Completion Report).
+11_DEFINITION_OF_DONE.md: restate Part 35's checklist verbatim as a literal checklist (domain done, use cases done, ports defined, adapters implemented, persistence implemented where required, API implemented where required, security implemented, unit/integration/API/architecture tests passing, manual testing performed where applicable, module docs exist, frontend API docs produced, AI_state updated, no unauthorized architectural changes).
+AI_state initial content (short templates — these are meant to be rewritten constantly):
+CURRENT_STATE.md: "Phase 1 in progress. FastAPI skeleton, config, logging, error handling, testing and tooling foundations exist. No database, no business modules yet."
+CURRENT_TASK.md: "CHUNK 1.11 — Phase 1 verification."
+PROGRESS.md: a markdown checklist of every chunk in Phases 1–3 (copy the chunk titles from this specification), all boxes checked through 1.10, rest unchecked.
+COMPLETED_WORK.md: one line per completed chunk so far (1.0 through 1.10).
+IN_PROGRESS.md: "Chunk 1.11."
+KNOWN_ISSUES.md: "None currently." (template header for future entries: issue, discovered in chunk, severity, status)
+ARCHITECTURE_STATE.md: "As-built so far: FastAPI app factory (app.py), thin entrypoint (main.py), pydantic-settings config, structlog logging with request-id middleware, generic 500 error handler. No modules, no shared_kernel content, no database yet."
+DATABASE_STATE.md: "No database integrated yet. Arrives in Phase 3."
+API_STATE.md: "Endpoints: GET /health → 200 {"status":"ok"}. No versioned /api/v1 endpoints yet."
+TEST_STATE.md: "All Phase 1 tests passing as of Chunk 1.10. Layers in use: unit, api. No integration or architecture tests yet (arrive Phase 2/3)."
+DECISIONS.md: copy the full ADR table from Section B of this specification.
+SESSION_HANDOFF.md: "No sessions completed under this protocol yet — this file starts being used from the end of Chunk 1.10 onward. Next: Chunk 1.11, Phase 1 verification."
+Acceptance criteria:
+All 12 AI_instructions/ files and 12 AI_state/ files exist with real, non-placeholder content.
+AI_instructions/ files are tracked by git; AI_state/ files are not (git status confirms).
 
 
                       
