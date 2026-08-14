@@ -1,7 +1,8 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
+*.pyo
+*.pyd
 .venv/
 env/
 venv/
@@ -19,9 +20,11 @@ venv.bak/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+dist/
+build/
 
 # Environment
 .env
 
-# Project specific
-current_instruction.txt
+# AI State (Private)
+AI_state/
