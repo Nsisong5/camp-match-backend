@@ -1,84 +1,143 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
-Objective: No code yet — confirm scope before writing anything, since shared kernel mistakes are expensive to unwind later.
-Implementation instructions:
-Re-read AI_instructions/02_ARCHITECTURE_RULES.md.
-Confirm src/camp_match/shared_kernel/domain/ and src/camp_match/shared_kernel/application/ exist (created empty in Chunk 1.2).
-Do not create anything beyond what Chunks 2.1–2.5 explicitly authorize, even if it seems convenient.
-Acceptance criteria: No new files. This is a checkpoint, not an implementation step — report back and wait for Chunk 2.1.
 
-CHUNK 2.1 — IDs
-
-Objective: One identifier value object, used everywhere an entity needs an ID.
-Architectural context: ADR-006 — plain UUID4, wrapped so it's a real value object (equality, hashing, string conversion) rather than a bare uuid.UUID scattered through the codebase.
+Objective: A Clock port so any business logic that depends on "now" is testable without real time passing.
 Files to create:
-src/camp_match/shared_kernel/domain/identifiers.py
+src/camp_match/shared_kernel/domain/clock.py — the port (interface) only.
+src/camp_match/platform/clock.py — the real implementation.
 Implementation instructions:
+shared_kernel/domain/clock.py:                    
+from __future__ import annotations
+from datetime import datetime
+from typing import Protocol
+
+class Clock(Protocol):
+    def now(self) -> datetime:
+        """Return the current UTC-aware datetime."""
+        ...
+          
+platform/clock.py
+from datetime import datetime, timezone
+from camp_match.shared_kernel.domain.clock import Clock
+
+class SystemClock:
+    def now(self) -> datetime:
+        return datetime.now(timezone.utc)
+          
+Business rules: any domain/application logic that needs "now" (expirations, scheduling, session filters, etc.) must receive a Clock through its constructor/use-case parameters — never call datetime.now() directly inside domain or application code. This is what makes time-dependent business logic deterministically testable. (Simple DB audit columns like created_at/updated_at are the one exception — see 07_DATABASE_RULES.md — those may use a database server default instead.)
+Tests you must write: tests/unit/shared_kernel/test_clock.py — SystemClock().now() returns a timezone-aware datetime in UTC. Also add a FixedClock test double under tests/support/fixed_clock.py (not in src/ — it's test-only) that returns a fixed, constructor-provided datetime, for use by every future test that needs to control time.
+Acceptance criteria: new tests pass; shared_kernel/domain/clock.py imports nothing beyond stdlib datetime/typing.
+
+CHUNK 2.4 — Events
+
+Objective: The minimal event foundation — a base event type and an in-process publish/subscribe bus. No broker, no persistence of events, no distributed delivery — that's explicitly out of scope per the handoff.
+Files to create:
+src/camp_match/shared_kernel/domain/events.py
+src/camp_match/shared_kernel/application/event_bus.py
+src/camp_match/platform/in_memory_event_bus.py
+Implementation instructions:
+shared_kernel/domain/events.py:
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from datetime import datetime
+from camp_match.shared_kernel.domain.identifiers import EntityId
+
+@dataclass(frozen=True)
+class DomainEvent:
+    event_id: EntityId = field(default_factory=EntityId.new)
+    occurred_at: datetime | None = None
+    # Modules subclass this and add their own fields, e.g. BookingConfirmed(DomainEvent).
+    
+shared_kernel/application/event_bus.py — the port:
+
+from __future__ import annotations
+from typing import Protocol
+from camp_match.shared_kernel.domain.events import DomainEvent
+
+class EventBus(Protocol):
+    async def publish(self, event: DomainEvent) -> None: ...
+    def subscribe(self, event_type: type[DomainEvent], handler: "EventHandler") -> None: ...
+
+EventHandler = "object"  # refine to a Callable/Protocol alias once the first real handler exists
+(Note to Gemini: define EventHandler properly as Callable[[DomainEvent], Awaitable[None]] rather than the placeholder string above — the placeholder is illustrative only, not literal code to copy.)
+platform/in_memory_event_bus.py — the adapter:
+
+from __future__ import annotations
+from collections import defaultdict
+from typing import Awaitable, Callable
+import structlog
+from camp_match.shared_kernel.domain.events import DomainEvent
+
+logger = structlog.get_logger()
+EventHandler = Callable[[DomainEvent], Awaitable[None]]
+
+class InMemoryEventBus:
+    def __init__(self) -> None:
+        self._handlers: dict[type, list[EventHandler]] = defaultdict(list)
+
+    def subscribe(self, event_type: type[DomainEvent], handler: EventHandler) -> None:
+        self._handlers[event_type].append(handler)
+
+    async def publish(self, event: DomainEvent) -> None:
+        logger.info("domain_event_published", event_type=type(event).__name__, event_id=str(event.event_id))
+        for handler in self._handlers[type(event)]:
+            await handler(event)
+Business rules: modules communicate across boundaries either through direct port calls (synchronous, when one module genuinely needs a response from another) or through events (when the producing module shouldn't need to know who consumes the fact that something happened — e.g. BookingConfirmed triggering a notification). Do not introduce an event for something that has exactly one caller and one callee with a direct dependency already — that's what ports are for.
+You must not: wire any real subscriber yet — there are no modules to subscribe. This chunk only proves the mechanism works.
+Tests you must write: tests/unit/shared_kernel/test_event_bus.py — a test event subclass gets published, a subscribed handler receives it, an unsubscribed event type triggers no handler, multiple handlers for the same event type all fire.
+Acceptance criteria: new tests pass
+
+CHUNK 2.5 — Common Contracts
+
+Objective: Two remaining shared, justified contracts: pagination, and the Unit of Work port (the interface only — the real database-backed implementation arrives in Phase 3 Chunk 3.4, which must satisfy this exact port).
+Files to create:
+src/camp_match/shared_kernel/application/pagination.py
+src/camp_match/shared_kernel/application/unit_of_work.py
+Implementation instructions:
+pagination.py:
 
 from __future__ import annotations
 from dataclasses import dataclass
-from uuid import UUID, uuid4
+from typing import Generic, TypeVar
 
-@dataclass(frozen=True, slots=True)
-class EntityId:
-    value: UUID
+T = TypeVar("T")
 
-    @classmethod
-    def new(cls) -> "EntityId":
-        return cls(uuid4())
+@dataclass(frozen=True)
+class PageRequest:
+    page: int = 1
+    page_size: int = 20
 
-    @classmethod
-    def from_string(cls, raw: str) -> "EntityId":
-        return cls(UUID(raw))
+    def __post_init__(self) -> None:
+        if self.page < 1:
+            raise ValueError("page must be >= 1")
+        if not (1 <= self.page_size <= 100):
+            raise ValueError("page_size must be between 1 and 100")
 
-    def __str__(self) -> str:
-        return str(self.value)
-        
-Individual modules (once built) may alias this for readability, e.g. UserId = EntityId, or wrap it in a thin subtype — that decision belongs to whichever module needs it, not to the shared kernel.
-Dependencies you may use: Python stdlib uuid, dataclasses. Nothing else.
-You must not: add a database-facing TypeDecorator here — that belongs in platform/db/ and arrives in Phase 3, since the shared kernel domain layer must not know SQLAlchemy exists.
-Tests you must write: tests/unit/shared_kernel/test_identifiers.py — EntityId.new() produces unique values; two EntityIds wrapping the same UUID are equal and hash equal; from_string round-trips with str(); an invalid string raises ValueError.
-Acceptance criteria: new tests pass; mypy src/camp_match/shared_kernel/domain/identifiers.py is clean.
+@dataclass(frozen=True)
+class Page(Generic[T]):
+    items: list[T]
+    total: int
+    page: int
+    page_size: int
+
+unit_of_work.py — port only:
+from __future__ import annotations
+from typing import Protocol
+
+class UnitOfWork(Protocol):
+    async def __aenter__(self) -> "UnitOfWork": ...
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
+
+Use cases that need a transaction boundary accept a UnitOfWork (or a factory that produces one) as a constructor dependency, and wrap their repository calls in async with uow: ... await uow.commit(). No concrete implementation exists until Phase 3 Chunk 3.4 — that's expected; this port has no consumer yet either, which is fine, since the point of this chunk is to fix the contract now so Phase 3's SQLAlchemy implementation has something exact to satisfy.
+Why these two, specifically, belong in the shared kernel and not a module: both are used by every module that will ever list or paginate data, or every module that will ever need an atomic multi-repository write — neither is meaningful scoped to one module, and neither depends on infrastructure to define.
+Tests you must write: tests/unit/shared_kernel/test_pagination.py — valid PageRequest constructs; page < 1 and page_size outside 1..100 both raise ValueError; Page holds items/total/page/page_size correctly. No test for UnitOfWork yet — it's a bare Protocol with no implementation to exercise until Phase 3.
+Acceptance criteria: new tests pass.
 
 
-CHUNK 2.2 — Errors
 
-Objective: The two-tier error hierarchy from ADR-007 — domain errors (business rule violations) and application errors (use-case failures that map to specific HTTP statuses).
-Files to create:
-src/camp_match/shared_kernel/domain/errors.py
-src/camp_match/shared_kernel/application/errors.py
-Implementation instructions:
-domain/errors.py — pure business-rule violations, no HTTP concept anywhere near this file:
 
-class DomainError(Exception):
-    """Base class for violations of a business rule. Framework-agnostic."""
 
-class InvariantViolationError(DomainError):
-    """Raised when an entity or aggregate would be left in an invalid state."""
-    
-application/errors.py — use-case-level failures, each maps to exactly one HTTP status (the mapping itself lives in Phase 3+/per-module error handlers, not here):
-
-class ApplicationError(Exception):
-    """Base class for use-case-level failures."""
-
-class NotFoundError(ApplicationError):
-    """The requested resource does not exist."""
-
-class ValidationError(ApplicationError):
-    """Input failed validation beyond what the DTO layer already checked."""
-
-class ConflictError(ApplicationError):
-    """The requested operation conflicts with current state (e.g. duplicate, already booked)."""
-
-class UnauthorizedError(ApplicationError):
-    """The caller is not authenticated."""
-
-class ForbiddenError(ApplicationError):
-    """The caller is authenticated but not permitted to perform this action."""
-                                                                                                                                                                                                                                                                                                                                                                            
-Business rules: DomainError subclasses are raised from shared_kernel/domain and per-module domain/ code only. ApplicationError subclasses are raised from application/use_cases/ code only. Adapters (including API routers) never raise either directly — they let them propagate and get translated by the error-handler layer (extended in Chunk 2.6/Phase 3 and per-module later).
-You must not: give these classes an HTTP status code attribute directly — that mapping is an adapter-layer concern (API rules, Chunk 08_API_RULES.md), not a property of the error itself. Keep the domain/application layers HTTP-agnostic.
-Tests you must write: tests/unit/shared_kernel/test_errors.py — each subclass is instantiable, carries a message, and isinstance checks confirm the hierarchy (e.g. NotFoundError is an ApplicationError but not a DomainError).
-Acceptance criteria: new tests pass; no import of fastapi anywhere in either new file (confirm manually — the automated check arrives in Chunk 2.6).
-                    
-  
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                

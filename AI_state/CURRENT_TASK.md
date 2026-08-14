@@ -1,2 +1,2 @@
 # Current Task
-Next chunk: 2.0 (Shared kernel preparation)
+Next chunk: 3.0 (Database and Persistence preparation)

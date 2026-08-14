@@ -1,13 +1,7 @@
 # Progress
-- [x] Chunk 1.0: Structure
-- [x] Chunk 1.1: Python & Poetry
-- [x] Chunk 1.2: Packages
-- [x] Chunk 1.3: FastAPI & Health
-- [x] Chunk 1.4: Settings
-- [x] Chunk 1.5: Error Handlers
-- [x] Chunk 1.6: Logging & Middleware
-- [x] Chunk 1.7: Test Harness
-- [x] Chunk 1.8: Static Analysis
-- [x] Chunk 1.9: Ignore/Cleanup
-- [x] Chunk 1.10: AI Instructions/State
-- [x] Chunk 1.11: Phase 1 Verification
+- [x] Chunk 2.0: Shared kernel prep
+- [x] Chunk 2.1: IDs
+- [x] Chunk 2.2: Errors
+- [x] Chunk 2.3: Clock
+- [x] Chunk 2.4: Events
+- [x] Chunk 2.5: Common Contracts
