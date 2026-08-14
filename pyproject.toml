@@ -13,6 +13,8 @@ uvicorn = {extras = ["standard"], version = "*"}
 pydantic = "*"
 pydantic-settings = "*"
 structlog = "*"
+sqlalchemy = "^2.0.52"
+asyncpg = "^0.31.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
@@ -22,6 +24,7 @@ httpx = "*"
 ruff = "*"
 mypy = "*"
 import-linter = "*"
+alembic = "^1.19.1"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
