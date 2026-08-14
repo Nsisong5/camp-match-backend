@@ -1,3 +1,2 @@
 # Completed Work
-- [x] Phase 1: Foundation
-- [x] Phase 2: Shared Kernel (IDs, Errors, Clock, Events, Pagination, UoW, Architecture tests)
+- [x] Phase 3: Database & Persistence (PostgreSQL, SQLAlchemy, Alembic, Session Lifecycle, Unit of Work)

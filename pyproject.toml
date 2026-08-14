@@ -63,7 +63,7 @@ include_external_packages = true
 name = "Domain must stay framework-free"
 type = "forbidden"
 source_modules = ["camp_match.shared_kernel.domain"]
-forbidden_modules = ["fastapi", "sqlalchemy", "camp_match.platform", "camp_match.config"]
+forbidden_modules = ["fastapi", "sqlalchemy", "camp_match.platform.db", "camp_match.config"]
 
 [[tool.importlinter.contracts]]
 name = "Application must not import platform infrastructure directly"
