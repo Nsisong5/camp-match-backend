@@ -13,6 +13,12 @@ Camp Match backend — modular monolith, hexagonal architecture. Under construct
 - Type checking: `poetry run mypy src`
 - Architectural boundaries: `poetry run lint-imports`
 
+## Database (Termux)
+- Run `scripts/db_bootstrap.sh` once after cloning.
+- Run `scripts/db_start.sh` at the start of every dev/test session.
+- Run `scripts/db_stop.sh` when done.
+The server does not survive a Termux/device restart automatically — you always start it manually. Consider `termux-wake-lock` for long sessions.
+
 ## Contributing / Commit Convention
 This project uses [Conventional Commits](https://www.conventionalcommits.org/).
 Please use one of the following types for your commit messages:

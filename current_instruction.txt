@@ -1,62 +1,105 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-CHUNK 2.6 — Architecture Tests
-Objective: Make the layering rules from AI_instructions/02_ARCHITECTURE_RULES.md machine-enforced, not just documented.
-Architectural context: ADR-010 — import-linter.
-Files to modify:
-pyproject.toml — add [tool.importlinter] contracts.
+PHASE 3 — DATABASE STRATEGY
+
+CHUNK 3.0 — PostgreSQL Setup
+Objective: A local PostgreSQL instance running natively inside Termux — no Docker. Docker requires kernel namespace/cgroup features that standard, non-rooted Android/Termux does not expose, so this environment uses Termux's own postgresql package directly.
+Architectural context: ADR-011 (revised) — Postgres runs as a native Termux process, started and stopped explicitly per session, since Termux has no init system to manage it automatically.
 Files to create:
-tests/architecture/test_layer_boundaries.py
+scripts/db_bootstrap.sh — one-time setup (install, initdb, create role/database).
+scripts/db_start.sh — start the server.
+scripts/db_stop.sh — stop the server.
+Files to modify:
+.env.example — add DATABASE_URL.
+.gitignore — ensure the Postgres data directory is not committed (it lives under Termux's $PREFIX, outside the repo, so no repo-level ignore entry is actually needed — confirm this and skip adding one if so).
 Implementation instructions:
-Add to pyproject.toml:
-[tool.importlinter]
-root_package = "camp_match"
+scripts/db_bootstrap.sh (run once):
+Bash
+#!/data/data/com.termux/files/usr/bin/bash
+set -e
+pkg install -y postgresql
+mkdir -p "$PREFIX/var/lib/postgresql"
+initdb "$PREFIX/var/lib/postgresql"
+pg_ctl -D "$PREFIX/var/lib/postgresql" -l "$PREFIX/var/lib/postgresql/server.log" start
+sleep 2
+createuser -P -s -e camp_match      # you will be prompted; use password "camp_match" for local dev
+createdb -O camp_match camp_match_dev
+pg_ctl -D "$PREFIX/var/lib/postgresql" stop
+echo "Bootstrap complete. Use scripts/db_start.sh to start the server."
 
-[[tool.importlinter.contracts]]
-name = "Domain must stay framework-free"
-type = "forbidden"
-source_modules = ["camp_match.shared_kernel.domain"]
-forbidden_modules = ["fastapi", "sqlalchemy", "camp_match.platform", "camp_match.config"]
+scripts/db_start.sh
 
-[[tool.importlinter.contracts]]
-name = "Application must not import platform infrastructure directly"
-type = "forbidden"
-source_modules = ["camp_match.shared_kernel.application"]
-forbidden_modules = ["fastapi", "sqlalchemy"]
-(More contracts get added in Phase 3 Chunk 3.8, and again every time a business module is implemented — this file grows over the life of the project; it is never considered "finished.")
-2. tests/architecture/test_layer_boundaries.py:
-import pytest
-from importlinter.application import use_cases as importlinter_use_cases
-
-@pytest.mark.architecture
-def test_import_boundaries_hold() -> None:
-    # Invoke import-linter's contract check programmatically and assert a clean report.
-    # Consult the installed import-linter version's public API for the exact call signature
-    # (e.g. importlinter.cli or importlinter.application.use_cases) and adapt accordingly —
-    # the intent is: this test fails if `poetry run lint-imports` would fail.
-    ...
-    
-(Note to Gemini: import-linter's public Python API differs slightly across versions. If a stable in-process API isn't available in the installed version, it is acceptable for this test to shell out via subprocess.run(["poetry", "run", "lint-imports"]) and assert returncode == 0 instead — either approach satisfies the acceptance criteria below. Document which approach you used in the Completion Report.)
-3. Also add the command poetry run lint-imports to README.md's Code Quality section.
-Tests you must write: the file above, populated with a working implementation using whichever approach you chose.
-Acceptance criteria:
-poetry run lint-imports exits 0.
-poetry run pytest -m architecture passes.
-Manually confirm the contract actually works: temporarily add import fastapi inside shared_kernel/domain/clock.py, confirm lint-imports now fails, then remove the line before committing.
-
-CHUNK 2.7 — Phase 2 Verification
-
-Implementation instructions:
-Run the full suite: poetry run pytest, poetry run ruff check ., poetry run mypy src, poetry run lint-imports — all clean.
-Update AI_state/ARCHITECTURE_STATE.md to list every shared kernel component now in place (EntityId, DomainError/ApplicationError hierarchies, Clock/SystemClock, DomainEvent/EventBus/InMemoryEventBus, PageRequest/Page, UnitOfWork port with no implementation yet).
-Update AI_state/TEST_STATE.md to note the architecture test layer is now active.
-Set AI_state/CURRENT_TASK.md to CHUNK 3.0 — PostgreSQL setup.
-Produce the Completion Report.
-Acceptance criteria: matches Phase 2 Acceptance Criteria below.
-
+#!/data/data/com.termux/files/usr/bin/bash
+pg_ctl -D "$PREFIX/var/lib/postgresql" -l "$PREFIX/var/lib/postgresql/server.log" start
                 
-            
+scripts/db_stop.sh
+#!/data/data/com.termux/files/usr/bin/bash
+pg_ctl -D "$PREFIX/var/lib/postgresql" stop
+Make all three executable (chmod +x scripts/db_*.sh).
+4. Run scripts/db_bootstrap.sh once. Confirm psql -U camp_match -d camp_match_dev -c "SELECT 1;" returns a row.
+5. Add to .env.example:
+
+DATABASE_URL=postgresql+asyncpg://camp_match:camp_match@localhost:5432/camp_match_dev
+
+Standard port 5432 is fine here — there is no host/container port mapping to worry about, since everything runs on the same Termux filesystem.
+6. Check $PREFIX/var/lib/postgresql/postgresql.conf — confirm listen_addresses includes localhost (Termux's default initdb usually sets this already; if it's commented out or set to nothing, uncomment and set it to 'localhost' so SQLAlchemy/asyncpg can connect over TCP rather than only a Unix socket).
+7. Document in README.md under "Database (Termux)": run scripts/db_bootstrap.sh once after cloning; run scripts/db_start.sh at the start of every dev/test session and scripts/db_stop.sh when done; the server does not survive a Termux/device restart automatically — you always start it manually. If you're running a long session, consider termux-wake-lock (from the Termux:API add-on) so Android doesn't suspend Termux and kill the server mid-session.
+You must not: add a docker-compose.yml or any Docker reference back into the project — this environment cannot run it.
+Acceptance criteria:
+scripts/db_start.sh starts the server with no error; pg_isready -h localhost -p 5432 reports accepting connections.
+psql -U camp_match -d camp_match_dev -c "SELECT 1;" succeeds.
+scripts/db_stop.sh stops it cleanly
+
+CHUNK 3.1 — SQLAlchemy Setup
+
+Objective: Add SQLAlchemy (async) and asyncpg as dependencies; establish the declarative base with a real naming convention.
+Architectural context: ADR-004.
+Files to modify:
+pyproject.toml — add runtime deps sqlalchemy (>=2.0), asyncpg; dev dep aiosqlite is not needed — tests run against real Postgres per ADR-013, not SQLite.
+Files to create:
+src/camp_match/platform/db/base.py
+Implementation instructions:
+poetry add sqlalchemy asyncpg, then poetry add --group dev alembic (Alembic is dev-only tooling, not a runtime dependency of the deployed app).
+platform/db/base.py:
+
+from sqlalchemy.orm import DeclarativeBase
+
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
+class Base(DeclarativeBase):
+    metadata_naming_convention = NAMING_CONVENTION
+
+        
+apply NAMING_CONVENTION via metadata = MetaData(naming_convention=NAMING_CONVENTION) as a class attribute on Base, per current SQLAlchemy 2.0 declarative API — the snippet above shows the convention dict; wire it exactly as SQLAlchemy 2.0's documented pattern for declarative naming conventions requires.)
+3. This Base is the only declarative base for the entire project — every module's ORM models (once modules exist) inherit from this one, imported from camp_match.platform.db.base. Do not create a second base.
+You must not: define any table/model yet — no business tables exist until the Identity module.
+Tests you must write: tests/unit/platform/test_db_base.py — confirms Base.metadata.naming_convention (or equivalent) contains the exact keys above.
+Acceptance criteria: new test passes; mypy clean.
+
+        
+CHUNK 3.2 — Database Configuration
+Objective: Extend Settings with database configuration.
+Files to modify:
+src/camp_match/config/settings.py
+Implementation instructions:
+Add to the Settings class from Chunk 1.4:
+
+database_url: str = "postgresql+asyncpg://camp_match:camp_match@localhost:5433/camp_match_dev"
+    database_pool_size: int = 5
+    database_echo: bool = False
+    
+    
+                                                                                                                                                                                                
+Update .env.example to include DATABASE_POOL_SIZE and DATABASE_ECHO alongside the DATABASE_URL added in Chunk 3.0.
+Tests you must write: extend tests/unit/config/test_settings.py to confirm database_url overrides correctly via environment variable.
+Acceptance criteria: new/updated tests pass.            
     
 
 
