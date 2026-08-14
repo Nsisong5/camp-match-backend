@@ -52,6 +52,22 @@ exclude = ["tests/"]
 module = "tests.*"
 disallow_untyped_defs = false
 
+[tool.importlinter]
+root_package = "camp_match"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain must stay framework-free"
+type = "forbidden"
+source_modules = ["camp_match.shared_kernel.domain"]
+forbidden_modules = ["fastapi", "sqlalchemy", "camp_match.platform", "camp_match.config"]
+
+[[tool.importlinter.contracts]]
+name = "Application must not import platform infrastructure directly"
+type = "forbidden"
+source_modules = ["camp_match.shared_kernel.application"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

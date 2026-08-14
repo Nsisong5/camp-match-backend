@@ -11,6 +11,7 @@ Camp Match backend — modular monolith, hexagonal architecture. Under construct
 - Linting: `poetry run ruff check .`
 - Formatting: `poetry run ruff format .`
 - Type checking: `poetry run mypy src`
+- Architectural boundaries: `poetry run lint-imports`
 
 ## Contributing / Commit Convention
 This project uses [Conventional Commits](https://www.conventionalcommits.org/).

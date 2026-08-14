@@ -1,141 +1,63 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: A Clock port so any business logic that depends on "now" is testable without real time passing.
+CHUNK 2.6 — Architecture Tests
+Objective: Make the layering rules from AI_instructions/02_ARCHITECTURE_RULES.md machine-enforced, not just documented.
+Architectural context: ADR-010 — import-linter.
+Files to modify:
+pyproject.toml — add [tool.importlinter] contracts.
 Files to create:
-src/camp_match/shared_kernel/domain/clock.py — the port (interface) only.
-src/camp_match/platform/clock.py — the real implementation.
+tests/architecture/test_layer_boundaries.py
 Implementation instructions:
-shared_kernel/domain/clock.py:                    
-from __future__ import annotations
-from datetime import datetime
-from typing import Protocol
+Add to pyproject.toml:
+[tool.importlinter]
+root_package = "camp_match"
 
-class Clock(Protocol):
-    def now(self) -> datetime:
-        """Return the current UTC-aware datetime."""
-        ...
-          
-platform/clock.py
-from datetime import datetime, timezone
-from camp_match.shared_kernel.domain.clock import Clock
+[[tool.importlinter.contracts]]
+name = "Domain must stay framework-free"
+type = "forbidden"
+source_modules = ["camp_match.shared_kernel.domain"]
+forbidden_modules = ["fastapi", "sqlalchemy", "camp_match.platform", "camp_match.config"]
 
-class SystemClock:
-    def now(self) -> datetime:
-        return datetime.now(timezone.utc)
-          
-Business rules: any domain/application logic that needs "now" (expirations, scheduling, session filters, etc.) must receive a Clock through its constructor/use-case parameters — never call datetime.now() directly inside domain or application code. This is what makes time-dependent business logic deterministically testable. (Simple DB audit columns like created_at/updated_at are the one exception — see 07_DATABASE_RULES.md — those may use a database server default instead.)
-Tests you must write: tests/unit/shared_kernel/test_clock.py — SystemClock().now() returns a timezone-aware datetime in UTC. Also add a FixedClock test double under tests/support/fixed_clock.py (not in src/ — it's test-only) that returns a fixed, constructor-provided datetime, for use by every future test that needs to control time.
-Acceptance criteria: new tests pass; shared_kernel/domain/clock.py imports nothing beyond stdlib datetime/typing.
+[[tool.importlinter.contracts]]
+name = "Application must not import platform infrastructure directly"
+type = "forbidden"
+source_modules = ["camp_match.shared_kernel.application"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+(More contracts get added in Phase 3 Chunk 3.8, and again every time a business module is implemented — this file grows over the life of the project; it is never considered "finished.")
+2. tests/architecture/test_layer_boundaries.py:
+import pytest
+from importlinter.application import use_cases as importlinter_use_cases
 
-CHUNK 2.4 — Events
-
-Objective: The minimal event foundation — a base event type and an in-process publish/subscribe bus. No broker, no persistence of events, no distributed delivery — that's explicitly out of scope per the handoff.
-Files to create:
-src/camp_match/shared_kernel/domain/events.py
-src/camp_match/shared_kernel/application/event_bus.py
-src/camp_match/platform/in_memory_event_bus.py
-Implementation instructions:
-shared_kernel/domain/events.py:
-
-from __future__ import annotations
-from dataclasses import dataclass, field
-from datetime import datetime
-from camp_match.shared_kernel.domain.identifiers import EntityId
-
-@dataclass(frozen=True)
-class DomainEvent:
-    event_id: EntityId = field(default_factory=EntityId.new)
-    occurred_at: datetime | None = None
-    # Modules subclass this and add their own fields, e.g. BookingConfirmed(DomainEvent).
+@pytest.mark.architecture
+def test_import_boundaries_hold() -> None:
+    # Invoke import-linter's contract check programmatically and assert a clean report.
+    # Consult the installed import-linter version's public API for the exact call signature
+    # (e.g. importlinter.cli or importlinter.application.use_cases) and adapt accordingly —
+    # the intent is: this test fails if `poetry run lint-imports` would fail.
+    ...
     
-shared_kernel/application/event_bus.py — the port:
+(Note to Gemini: import-linter's public Python API differs slightly across versions. If a stable in-process API isn't available in the installed version, it is acceptable for this test to shell out via subprocess.run(["poetry", "run", "lint-imports"]) and assert returncode == 0 instead — either approach satisfies the acceptance criteria below. Document which approach you used in the Completion Report.)
+3. Also add the command poetry run lint-imports to README.md's Code Quality section.
+Tests you must write: the file above, populated with a working implementation using whichever approach you chose.
+Acceptance criteria:
+poetry run lint-imports exits 0.
+poetry run pytest -m architecture passes.
+Manually confirm the contract actually works: temporarily add import fastapi inside shared_kernel/domain/clock.py, confirm lint-imports now fails, then remove the line before committing.
 
-from __future__ import annotations
-from typing import Protocol
-from camp_match.shared_kernel.domain.events import DomainEvent
+CHUNK 2.7 — Phase 2 Verification
 
-class EventBus(Protocol):
-    async def publish(self, event: DomainEvent) -> None: ...
-    def subscribe(self, event_type: type[DomainEvent], handler: "EventHandler") -> None: ...
-
-EventHandler = "object"  # refine to a Callable/Protocol alias once the first real handler exists
-(Note to Gemini: define EventHandler properly as Callable[[DomainEvent], Awaitable[None]] rather than the placeholder string above — the placeholder is illustrative only, not literal code to copy.)
-platform/in_memory_event_bus.py — the adapter:
-
-from __future__ import annotations
-from collections import defaultdict
-from typing import Awaitable, Callable
-import structlog
-from camp_match.shared_kernel.domain.events import DomainEvent
-
-logger = structlog.get_logger()
-EventHandler = Callable[[DomainEvent], Awaitable[None]]
-
-class InMemoryEventBus:
-    def __init__(self) -> None:
-        self._handlers: dict[type, list[EventHandler]] = defaultdict(list)
-
-    def subscribe(self, event_type: type[DomainEvent], handler: EventHandler) -> None:
-        self._handlers[event_type].append(handler)
-
-    async def publish(self, event: DomainEvent) -> None:
-        logger.info("domain_event_published", event_type=type(event).__name__, event_id=str(event.event_id))
-        for handler in self._handlers[type(event)]:
-            await handler(event)
-Business rules: modules communicate across boundaries either through direct port calls (synchronous, when one module genuinely needs a response from another) or through events (when the producing module shouldn't need to know who consumes the fact that something happened — e.g. BookingConfirmed triggering a notification). Do not introduce an event for something that has exactly one caller and one callee with a direct dependency already — that's what ports are for.
-You must not: wire any real subscriber yet — there are no modules to subscribe. This chunk only proves the mechanism works.
-Tests you must write: tests/unit/shared_kernel/test_event_bus.py — a test event subclass gets published, a subscribed handler receives it, an unsubscribed event type triggers no handler, multiple handlers for the same event type all fire.
-Acceptance criteria: new tests pass
-
-CHUNK 2.5 — Common Contracts
-
-Objective: Two remaining shared, justified contracts: pagination, and the Unit of Work port (the interface only — the real database-backed implementation arrives in Phase 3 Chunk 3.4, which must satisfy this exact port).
-Files to create:
-src/camp_match/shared_kernel/application/pagination.py
-src/camp_match/shared_kernel/application/unit_of_work.py
 Implementation instructions:
-pagination.py:
+Run the full suite: poetry run pytest, poetry run ruff check ., poetry run mypy src, poetry run lint-imports — all clean.
+Update AI_state/ARCHITECTURE_STATE.md to list every shared kernel component now in place (EntityId, DomainError/ApplicationError hierarchies, Clock/SystemClock, DomainEvent/EventBus/InMemoryEventBus, PageRequest/Page, UnitOfWork port with no implementation yet).
+Update AI_state/TEST_STATE.md to note the architecture test layer is now active.
+Set AI_state/CURRENT_TASK.md to CHUNK 3.0 — PostgreSQL setup.
+Produce the Completion Report.
+Acceptance criteria: matches Phase 2 Acceptance Criteria below.
 
-from __future__ import annotations
-from dataclasses import dataclass
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-@dataclass(frozen=True)
-class PageRequest:
-    page: int = 1
-    page_size: int = 20
-
-    def __post_init__(self) -> None:
-        if self.page < 1:
-            raise ValueError("page must be >= 1")
-        if not (1 <= self.page_size <= 100):
-            raise ValueError("page_size must be between 1 and 100")
-
-@dataclass(frozen=True)
-class Page(Generic[T]):
-    items: list[T]
-    total: int
-    page: int
-    page_size: int
-
-unit_of_work.py — port only:
-from __future__ import annotations
-from typing import Protocol
-
-class UnitOfWork(Protocol):
-    async def __aenter__(self) -> "UnitOfWork": ...
-    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
-    async def commit(self) -> None: ...
-    async def rollback(self) -> None: ...
-
-Use cases that need a transaction boundary accept a UnitOfWork (or a factory that produces one) as a constructor dependency, and wrap their repository calls in async with uow: ... await uow.commit(). No concrete implementation exists until Phase 3 Chunk 3.4 — that's expected; this port has no consumer yet either, which is fine, since the point of this chunk is to fix the contract now so Phase 3's SQLAlchemy implementation has something exact to satisfy.
-Why these two, specifically, belong in the shared kernel and not a module: both are used by every module that will ever list or paginate data, or every module that will ever need an atomic multi-repository write — neither is meaningful scoped to one module, and neither depends on infrastructure to define.
-Tests you must write: tests/unit/shared_kernel/test_pagination.py — valid PageRequest constructs; page < 1 and page_size outside 1..100 both raise ValueError; Page holds items/total/page/page_size correctly. No test for UnitOfWork yet — it's a bare Protocol with no implementation to exercise until Phase 3.
-Acceptance criteria: new tests pass.
-
+                
+            
+    
 
 
 

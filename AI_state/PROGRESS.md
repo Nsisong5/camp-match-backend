@@ -5,3 +5,5 @@
 - [x] Chunk 2.3: Clock
 - [x] Chunk 2.4: Events
 - [x] Chunk 2.5: Common Contracts
+- [x] Chunk 2.6: Architecture Tests
+- [x] Chunk 2.7: Phase 2 Verification
