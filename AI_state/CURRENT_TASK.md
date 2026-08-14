@@ -1,2 +1,2 @@
 # Current Task
-Next chunk: 1.9 (.gitignore and final cleanup)
+Next chunk: 2.0 (Shared kernel preparation)

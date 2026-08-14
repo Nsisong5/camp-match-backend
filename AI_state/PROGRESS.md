@@ -8,3 +8,6 @@
 - [x] Chunk 1.6: Logging & Middleware
 - [x] Chunk 1.7: Test Harness
 - [x] Chunk 1.8: Static Analysis
+- [x] Chunk 1.9: Ignore/Cleanup
+- [x] Chunk 1.10: AI Instructions/State
+- [x] Chunk 1.11: Phase 1 Verification
