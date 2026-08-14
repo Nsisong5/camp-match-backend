@@ -29,36 +29,30 @@ Produce a Completion Report in your reply with exactly these fields: What was co
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Wire Ruff and mypy with real configuration, not defaults.
+Objective: Populate .gitignore per ADR-012, and document the commit convention.
 Files to modify:
-pyproject.toml — add [tool.ruff] and [tool.mypy].
+.gitignore
+README.md — add "Contributing / Commit Convention" section.
 Implementation instructions:
-Ruff config:
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
-
-[tool.ruff.format]
-quote-style = "double"
-mypy config
-[tool.mypy]
-python_version = "3.12"
-strict = true
-exclude = ["tests/"]
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
-(strict = true applies to src/camp_match only, via the exclude pattern — tests are relaxed.)
-3. Run poetry run ruff check ., poetry run ruff format ., poetry run mypy src and fix every finding in code written so far (Chunks 1.0–1.7).
-4. Add exact commands to README.md under a "Code Quality" heading.
+Populate .gitignore with at minimum:
+.venv/
+__pycache__/
+*.pyc
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+AI_state/
+Per ADR-012, AI_state/ is excluded from the public repo; AI_instructions/ and docs/ are not in this list — they get committed.
+2. If AI_state/ files were accidentally committed earlier (they shouldn't have been, since Chunk 1.10 hasn't run yet), that's fine — this chunk runs before AI_state exists.
+3. Document the Conventional Commits convention in README.md (types: feat, fix, chore, docs, test, refactor, build, ci) — this simply documents the Standing Instruction already in force since Chunk 1.0.
 Acceptance criteria:
-poetry run ruff check . exits 0.
-poetry run mypy src exits 0.
-poetry run pytest still passes.
+git status after creating a dummy file under AI_state/ shows it as ignored.
+.env (if present locally) does not appear in git status.
 
 
 
