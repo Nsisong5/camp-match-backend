@@ -1,88 +1,111 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Create the Identity module's folder structure, empty. No logic in this chunk.
-Preconditions: Phase 1–3 complete (AI_state/CURRENT_TASK.md should already say so).
-Files to create (every file gets a one-line docstring stating its responsibility, same convention as platform/):
-src/camp_match/modules/identity/__init__.py
-src/camp_match/modules/identity/domain/__init__.py
-src/camp_match/modules/identity/domain/value_objects.py
-src/camp_match/modules/identity/domain/entities.py
-src/camp_match/modules/identity/domain/events.py
-src/camp_match/modules/identity/application/__init__.py
-src/camp_match/modules/identity/application/errors.py
-src/camp_match/modules/identity/application/ports/__init__.py
-src/camp_match/modules/identity/application/ports/inbound.py
-src/camp_match/modules/identity/application/ports/outbound.py
-src/camp_match/modules/identity/application/use_cases/__init__.py
-src/camp_match/modules/identity/adapters/__init__.py
-src/camp_match/modules/identity/adapters/persistence/__init__.py
-src/camp_match/modules/identity/adapters/security/__init__.py
-src/camp_match/modules/identity/adapters/api/__init__.py
-tests/unit/identity/__init__.py
-tests/unit/identity/domain/__init__.py
-tests/unit/identity/application/__init__.py
-tests/integration/identity/__init__.py
-tests/api/identity/__init__.py
+CHUNK 4 — Ports
 
-Note the addition of adapters/security/ — this is a new subfolder not explicitly named in AI_instructions/03_MODULE_RULES.md's original template, added here because password hashing and token issuance are security infrastructure, not "external" integrations in the sense that folder was meant for (payment/email providers). Add one sentence to 03_MODULE_RULES.md noting adapters/security/ as an available, optional subfolder for any module that owns credential or token handling.
-Acceptance criteria: every file above importable with no error; docs/modules/ has no identity.md yet (that arrives in Chunk 11).
+Objective: Fix the exact contracts everything else gets built against — nothing here is implemented, only promised. Getting this chunk precisely right is what makes Chunks 5–9 unambiguous.
+Files to modify: application/ports/inbound.py, application/ports/outbound.py.
+A note on request/response shapes throughout this port: use plain @dataclass types for every request/response, not Pydantic models — Pydantic belongs to the API adapter (Chunk 9), not the application layer. This keeps the use cases callable by anything (HTTP today, a future internal call from another module, a test) without dragging FastAPI's validation machinery in.
+Inbound ports (one per use case, each a Protocol with a single method — name the method execute, consistently, across all six):
 
-CHUNK 2 — Domain Layer
+Port
+Request fields
+Response fields
+RegisterAccount
+email: str, raw_password: str
+id: str, email: str, status: str, created_at: datetime
+AuthenticateUser
+email: str, raw_password: str
+access_token: str, refresh_token: str, token_type: str, expires_in: int
+RefreshSession
+refresh_token: str
+same shape as AuthenticateUser's response
+Logout
+refresh_token: str
+nothing (empty response — this call either succeeds or raises)
+GetIdentityById
+identity_id: str
+id: str, email: str, status: str, created_at: datetime
+DisableAccount / ReactivateAccount
+identity_id: str
+same shape as GetIdentityById's response, reflecting the new status
+Outbound ports:
+IdentityRepository — three methods: add(account: UserAccount) -> None (a brand-new account only — see Chunk 6 for what happens if the email collides at the database level anyway), get_by_email(email: EmailAddress) -> UserAccount | None, get_by_id(identity_id: EntityId) -> UserAccount | None, update(account: UserAccount) -> None (persists a status change to an existing account). No generic save/delete — every method here has a specific, named reason to exist.
+PasswordHasher — two methods: hash(raw_password: str) -> str, verify(raw_password: str, encoded_hash: str) -> bool.
+AuthenticationSessionPort — four methods: issue_tokens(identity_id: EntityId) -> TokenPair, refresh(refresh_token: str) -> TokenPair, revoke(refresh_token: str) -> None (must not raise if the token is already unknown/revoked — idempotent, see Chunk 5's logout steps), decode_access_token(access_token: str) -> EntityId (raises InvalidCredentials on anything invalid or expired). Define TokenPair here too, as a small dataclass: access_token: str, refresh_token: str, token_type: str, expires_in: int.
+Identity reuses the shared-kernel Clock, EventBus, and UnitOfWork ports directly — do not redefine them here.
+Prohibition: no implementation logic anywhere in this chunk — every method body is ... (a Protocol). If you find yourself wanting to write real logic here, that logic belongs in Chunk 5, 6, or 7 instead.
+Tests you must write: none — this chunk defines contracts, not behavior. mypy passing on both files is the acceptance bar.
+                                                                                                                                             
+CHUNK 5 — Use Cases
 
-Objective: The pure business concepts Identity is built around — no FastAPI, no SQLAlchemy, no database, nothing except the shared kernel.
-Files to modify: domain/value_objects.py, domain/entities.py, domain/events.py.
-value_objects.py — two value objects:
-EmailAddress — wraps a single email string. On construction: strip surrounding whitespace, lowercase the whole address, and check it has a basic valid shape (something in the form local-part@domain, domain contains at least one dot) using only the standard library (re is fine — do not add email-validator or any third-party package here; that check happens separately at the API boundary). Reject anything longer than 254 characters. An invalid value raises ValueError at construction — the application layer is responsible for turning that into the right application-level error (see Chunk 5). Two EmailAddress instances are equal if their normalized values match.
-AccountStatus — an enum with exactly three members: ACTIVE, SUSPENDED, DISABLED. Nothing else. (No PENDING_VERIFICATION — see ADR-018.)
-entities.py — one entity, UserAccount:
-Fields: id (reuse the shared-kernel EntityId directly — do not invent a competing identifier type, per the handoff's own instruction; you may alias it as IdentityId = EntityId for readability within this module), email (EmailAddress), password_hash (str — this is the already-hashed, opaque output of the password hasher; the raw password never reaches this class, ever), status (AccountStatus), created_at (datetime).
-Behavior the entity itself should expose (as methods, not free functions elsewhere):
-A way to construct a brand-new account in the ACTIVE state (this is what RegisterAccount will call).
-A way to transition to SUSPENDED/DISABLED/back to ACTIVE that enforces the state machine — reactivating an already-active account or disabling an already-disabled one should be a harmless no-op at the entity level, not an error (the use case layer decides whether to treat that as noteworthy; the entity itself just doesn't do redundant work or throw over it).
-A read-only way to check "is this account allowed to authenticate right now" (true only when status == ACTIVE) — AuthenticateUser will call this rather than comparing the enum itself, so the rule lives in exactly one place.
-events.py — three domain events, each a frozen dataclass extending the shared-kernel DomainEvent (which already supplies event_id and occurred_at): UserRegistered (carries the new account's id and email), AccountDisabled (carries the account id), AccountReactivated (carries the account id). No UserAuthenticated event — see ADR-022.
-Business rules to enforce here, not later: identifier stability (an EntityId, once assigned, never changes for the life of the account — nothing in this class should ever let it be reassigned); raw passwords never touch this file in any form.
-Dependencies you may use: shared-kernel EntityId, shared-kernel DomainEvent, Python stdlib (dataclasses, enum, re, datetime). Nothing else.
-Tests you must write: tests/unit/identity/domain/test_email_address.py (valid addresses normalize correctly and compare equal regardless of case/whitespace; malformed addresses raise ValueError; a 255+ character address is rejected) and tests/unit/identity/domain/test_user_account.py (a new account starts ACTIVE; disabling then reactivating produces ACTIVE again; disabling twice doesn't error; can_authenticate is only true when ACTIVE).
+Objective: The actual business logic, implementing the inbound ports from Chunk 4, built entirely against outbound ports (repository, hasher, session, clock, event bus) — no real database, no real JWT library, no FastAPI anywhere in this chunk. You should be able to fully test everything here using fake/in-memory implementations of the outbound ports.
+Files to create: one file per use case under application/use_cases/ — register_account.py, authenticate_user.py, refresh_session.py, logout.py, get_identity.py, disable_account.py, reactivate_account.py. Each is a class implementing the matching inbound port, constructed with whichever outbound ports it actually needs (not all of them need all five — GetIdentityById needs only the repository, for instance).
+A governing rule for this whole chunk, stated once: format-level validation (is this a plausible email shape, is the password within the allowed length) is Pydantic's job at the API boundary (Chunk 9) — do not duplicate that here. What belongs in this chunk is validation Pydantic structurally cannot express: uniqueness, state transitions, "does this credential actually match this account." Two sources of truth for the same rule is worse than one correct source.
+RegisterAccount — steps, in order:
+Construct an EmailAddress from the raw input (letting ValueError surface as InvalidAuthenticationRequest if it somehow reaches this layer malformed).
+Ask the repository for an existing account with that email. If one exists, log at INFO ("registration_rejected_duplicate", with the attempted email) and raise IdentityAlreadyExists.
+Hash the raw password via PasswordHasher.hash.
+Construct a new UserAccount (new EntityId, the normalized email, the hash, ACTIVE), using Clock.now() for its created_at.
+Persist it via the repository's add, inside a UnitOfWork — commit on success.
+Race-condition handling: even after step 2's check, two near-simultaneous registrations for the same email can both pass that check before either commits. If the repository's add fails because the database's own unique constraint rejects it (see Chunk 6), catch that specific failure here (or let the repository translate it — your call, document which in the Completion Report) and raise IdentityAlreadyExists, exactly as if step 2 had caught it. The database is the real guarantee; step 2 is just a fast, friendly first check.
+Build and publish a UserRegistered event via the shared-kernel event bus, with occurred_at from the same Clock.
+Log at INFO: "registration_succeeded", with the new identity's id and email.
+Return the response DTO — id, email, status, created_at. Never anything password-related.
+AuthenticateUser — steps, in order (read this one carefully — the ordering is a deliberate security property, not arbitrary):
+Normalize the input email.
+Look the account up by email.
+If no account was found: log at WARNING ("login_failed", reason "account_not_found", the attempted email — this is a server-side-only log, never returned to the caller) and raise InvalidCredentials. Stop here.
+If an account was found, verify the password via PasswordHasher.verify. If it fails: log at WARNING ("login_failed", reason "invalid_password", the account's id — not the email, not the password) and raise InvalidCredentials. Stop here.
+Steps 3 and 4 must raise the exact same exception to the caller. This is the anti-enumeration rule from the handoff (Part 11) — an attacker probing for valid emails must not be able to tell "no such account" apart from "wrong password" from the API response alone. The log, which the caller never sees, is allowed and expected to be specific — that's what "observable without leaking secrets" (Part 34) actually means here, and it's exactly the debugging detail you asked to keep.
+Only now, with credentials confirmed correct, check the account's status. If it can't authenticate (per the entity's own check from Chunk 2): log at WARNING ("login_blocked", the specific status, the account id) and raise AccountSuspended or AccountDisabled accordingly — this response is allowed to be specific, since the caller has already proven they hold valid credentials for this exact account.
+Call AuthenticationSessionPort.issue_tokens for the account's id.
+Log at INFO: "login_succeeded", the account id.
+Return the token pair.
+RefreshSession — steps: call AuthenticationSessionPort.refresh with the incoming token, and return whatever it returns. All the actual validation (does this token exist, is it expired, is it already revoked) lives inside the session adapter itself (Chunk 7), since it owns the refresh-token storage — this use case is a thin pass-through on purpose, so the rotation mechanics have exactly one owner. Log at INFO on success ("refresh_succeeded") — the adapter is responsible for its own WARNING-level logging on the failure paths, since it's the one that knows why a token was rejected (not found vs. expired vs. already used).
+Logout — steps: call AuthenticationSessionPort.revoke with the incoming token. This must succeed (204-equivalent, no exception) whether the token was actively valid, already revoked, or not recognized at all — logout is idempotent by design (see Chunk 7 for why: the caller who's trying to log out shouldn't get an error just because they clicked twice). Log at INFO either way, noting whether it revoked something real or was a no-op.
+GetIdentityById — steps: parse the input id into an EntityId, look it up, raise IdentityNotFound if absent, otherwise return the response DTO.
+DisableAccount / ReactivateAccount — steps (mirror each other): look the account up (raise IdentityNotFound if absent — this one legitimately can happen, since nothing guarantees the id passed in refers to a real account), call the entity's own transition method from Chunk 2, persist via update, publish the matching event (AccountDisabled/AccountReactivated), log at INFO with the account id and new status, return the response DTO. If the account was already in the target state, this is a harmless no-op (per Chunk 2's entity behavior) — still log it, still return success, just don't publish a duplicate event for a transition that didn't actually happen (check the status before and after to decide whether to publish).
+Dependencies you may use: the ports from Chunk 4, the domain types from Chunk 2, the errors from Chunk 3, shared-kernel Clock/EventBus/UnitOfWork, structlog for the logging calls described above. Nothing from fastapi or sqlalchemy.
+Tests you must write: for each use case, build a minimal in-memory fake for whatever outbound ports it needs (a dict-backed fake repository, a fake hasher that just does a trivial reversible transform, a fake session port that returns predictable tokens) and place these fakes under tests/support/identity_fakes.py so all seven use-case test files can share them. Cover, at minimum: registration success and duplicate-email rejection; authentication success, unknown-email failure, wrong-password failure (assert both produce the identical exception type), suspended-account failure, disabled-account failure; refresh success and logout idempotency (calling logout twice doesn't raise the second time); get-by-id success and not-found; disable/reactivate success and the no-op-when-already-in-that-state case      
+   
+CHUNK 6 — Persistence
 
-CHUNK 3 — Application Errors
+Objective: The real, database-backed implementation of IdentityRepository.
+Files to create: adapters/persistence/models.py, adapters/persistence/repository.py.
+One table this chunk owns, identity_accounts:     
 
-
-Objective: The specific, named ways an Identity use case can fail — each one a subclass of a shared-kernel ApplicationError subtype, not a fresh hierarchy of its own.
-Files to modify: application/errors.py.
-Files to modify outside this module (small, justified — see ADR-023): src/camp_match/shared_kernel/application/errors.py — add one optional class attribute, code: str | None = None, to the base ApplicationError class. This lets any subclass, anywhere in the project, declare a stable machine-readable code without every module inventing its own way to do that.
-The six errors, each mapped to the shared-kernel category that matches what actually went wrong (not just picked to match the HTTP status you'd like):
-
-Identity error
-Extends
-code
-Meaning
-IdentityAlreadyExists
-ConflictError
-identity_already_exists
-Email is already registered to an account.
-InvalidCredentials
-UnauthorizedError
-invalid_credentials
-Email/password combination didn't check out — used identically whether the email doesn't exist or the password is wrong (see Chunk 5's authentication steps for why). Also reused for an invalid/expired/revoked refresh token — same category of failure.
-AccountSuspended
-ForbiddenError
-account_suspended
-Credentials were valid; the account's status forbids login right now.
-AccountDisabled
-ForbiddenError
-account_disabled
-Same as above, different status.
-IdentityNotFound
-NotFoundError
-identity_not_found
-Looked up by ID and nothing's there.
-InvalidAuthenticationRequest
-ValidationError
-invalid_authentication_request
-Reserved for a business-level input problem Pydantic couldn't have caught (see Chunk 5 — expect this one to see little or no use for now; don't force a use for it).
-Prohibition: do not give any of these classes their own HTTP status code — that mapping is the job of Chunk 8, which reads the shared-kernel category (ConflictError → 409, etc.), not anything Identity-specific. Keeping the status mapping in one place means every future module's errors get consistent HTTP behavior for free.
-Tests you must write: tests/unit/identity/application/test_errors.py — each of the six is an instance of its stated shared-kernel parent, each carries the exact code string from the table above.
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+Column
+Type
+Notes
+id
+UUID
+primary key
+email
+text
+not null, unique, stored already-normalized (lowercase)
+password_hash
+text
+not null
+status
+text
+not null, restricted to ACTIVE/SUSPENDED/DISABLED via a database CHECK constraint, default ACTIVE
+created_at
+timestamptz
+not null, server-generated default
+updated_at
+timestamptz
+not null, server-generated default, refreshed on update
+Inherit from the shared Base established in Phase 3 Chunk 3.1 — don't create a second declarative base. Use the project's naming convention (also Phase 3) for the table's constraints and indexes; you don't need to name anything manually.
+repository.py — SqlAlchemyIdentityRepository, implementing the IdentityRepository port from Chunk 4:
+Constructed with a SQLAlchemy AsyncSession (or the SqlAlchemyUnitOfWork from Phase 3 — your call which is cleaner given how the use cases in Chunk 5 call this; document the choice).
+add: insert a new row. If the database rejects it because of the unique constraint on email, catch that specific integrity error and re-raise it as IdentityAlreadyExists — this is what closes the race-condition gap flagged in Chunk 5. Do not let a raw SQLAlchemy/database exception escape this method.
+get_by_email / get_by_id: straightforward lookups, translating the ORM row back into a domain UserAccount (never return the ORM model itself outside this file — the rest of the application only ever sees the domain entity).
+update: persist a status change to an existing row.
+Migration: generate an Alembic migration (poetry run alembic revision --autogenerate -m "add identity_accounts table") and read the generated file before applying it — autogenerate is a draft, not a guarantee, per AI_instructions/07_DATABASE_RULES.md.
+Prohibition: nothing outside adapters/persistence/ in this module may import SQLAlchemy. The domain and application layers only ever see UserAccount, never the ORM model.
+Tests you must write: tests/integration/identity/test_identity_repository.py (marked integration, using the db_session fixture from Phase 3 Chunk 3.6) — add then retrieve by id and by email; retrieving a nonexistent email returns None; adding two accounts with the same email raises IdentityAlreadyExists, not a raw database error; updating status persists correctly.      
+   
+   
+   
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
