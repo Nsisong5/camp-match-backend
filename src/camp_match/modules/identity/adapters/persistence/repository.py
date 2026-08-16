@@ -1,18 +1,22 @@
 """SQLAlchemy-backed implementation of the IdentityRepository port."""
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from camp_match.modules.identity.application.errors import IdentityAlreadyExists
 from camp_match.modules.identity.adapters.persistence.models import AccountModel
+from camp_match.modules.identity.application.errors import IdentityAlreadyExists
 from camp_match.modules.identity.domain.entities import UserAccount
 from camp_match.modules.identity.domain.value_objects import AccountStatus, EmailAddress
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     from camp_match.shared_kernel.domain.identifiers import EntityId
+
 
 class SqlAlchemyIdentityRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -58,6 +62,7 @@ class SqlAlchemyIdentityRepository:
 
     def _to_domain(self, model: AccountModel) -> UserAccount:
         from camp_match.shared_kernel.domain.identifiers import EntityId
+
         return UserAccount(
             id=EntityId(model.id),
             email=EmailAddress(model.email),

@@ -1,7 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from camp_match.app import create_app
 from camp_match.config.settings import get_settings
@@ -31,16 +31,17 @@ async def setup_test_db():
 
     yield
 
+
 @pytest.fixture
 async def db_session(setup_test_db):
     settings = get_settings()
     test_db_url = settings.database_url.replace("_dev", "_test")
     test_engine = create_async_engine(test_db_url)
     session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
-    
+
     async with session_factory() as session:
         yield session
-    
+
     await test_engine.dispose()
 
 
