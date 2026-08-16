@@ -1,6 +1,8 @@
 class ApplicationError(Exception):
     """Base class for use-case-level failures."""
 
+    code: str | None = None
+
 
 class NotFoundError(ApplicationError):
     """The requested resource does not exist."""

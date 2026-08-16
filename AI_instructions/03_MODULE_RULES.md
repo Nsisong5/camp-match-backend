@@ -8,6 +8,7 @@ Template for `src/camp_match/modules/<module_name>/`:
 - adapters/
     - api/ (router.py, schemas.py, dependencies.py)
     - persistence/ (models.py, repository.py)
+    - security/ (optional: password hashing, token issuance, credentials)
     - external/ (if needed)
 
 Tests: `tests/unit/<module_name>/`, `tests/integration/<module_name>/`, `tests/api/<module_name>/`.

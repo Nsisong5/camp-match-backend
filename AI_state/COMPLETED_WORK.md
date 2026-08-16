@@ -1,2 +1,5 @@
 # Completed Work
-- [x] Phase 3: Database & Persistence (PostgreSQL, SQLAlchemy, Alembic, Session Lifecycle, Unit of Work)
+- [x] Phase 1: Foundation
+- [x] Phase 2: Shared Kernel
+- [x] Phase 3: Database Strategy
+- [x] Identity Module: Scaffolding, Domain (Value Objects, Entities, Events), Application Errors.

@@ -1,37 +1,88 @@
 
 EXECUTE THE BELOW INSTRUCTIONS
 
-Objective: Extend the Phase 2 import-linter contracts to cover the database layer now that it exists.
-Files to modify:
-pyproject.toml — add to [tool.importlinter.contracts].
-Implementation instructions: add:
+Objective: Create the Identity module's folder structure, empty. No logic in this chunk.
+Preconditions: Phase 1–3 complete (AI_state/CURRENT_TASK.md should already say so).
+Files to create (every file gets a one-line docstring stating its responsibility, same convention as platform/):
+src/camp_match/modules/identity/__init__.py
+src/camp_match/modules/identity/domain/__init__.py
+src/camp_match/modules/identity/domain/value_objects.py
+src/camp_match/modules/identity/domain/entities.py
+src/camp_match/modules/identity/domain/events.py
+src/camp_match/modules/identity/application/__init__.py
+src/camp_match/modules/identity/application/errors.py
+src/camp_match/modules/identity/application/ports/__init__.py
+src/camp_match/modules/identity/application/ports/inbound.py
+src/camp_match/modules/identity/application/ports/outbound.py
+src/camp_match/modules/identity/application/use_cases/__init__.py
+src/camp_match/modules/identity/adapters/__init__.py
+src/camp_match/modules/identity/adapters/persistence/__init__.py
+src/camp_match/modules/identity/adapters/security/__init__.py
+src/camp_match/modules/identity/adapters/api/__init__.py
+tests/unit/identity/__init__.py
+tests/unit/identity/domain/__init__.py
+tests/unit/identity/application/__init__.py
+tests/integration/identity/__init__.py
+tests/api/identity/__init__.py
 
-[[tool.importlinter.contracts]]
-name = "Domain must not know SQLAlchemy exists"
-type = "forbidden"
-source_modules = ["camp_match.shared_kernel.domain"]
-forbidden_modules = ["sqlalchemy", "camp_match.platform.db"]
+Note the addition of adapters/security/ — this is a new subfolder not explicitly named in AI_instructions/03_MODULE_RULES.md's original template, added here because password hashing and token issuance are security infrastructure, not "external" integrations in the sense that folder was meant for (payment/email providers). Add one sentence to 03_MODULE_RULES.md noting adapters/security/ as an available, optional subfolder for any module that owns credential or token handling.
+Acceptance criteria: every file above importable with no error; docs/modules/ has no identity.md yet (that arrives in Chunk 11).
 
-[[tool.importlinter.contracts]]
-name = "Config must not be imported from inside domain"
-type = "forbidden"
-source_modules = ["camp_match.shared_kernel.domain"]
-forbidden_modules = ["camp_match.config"]
+CHUNK 2 — Domain Layer
 
-(The first sqlalchemy forbidden-modules contract already existed from Chunk 2.6 — confirm it isn't duplicated; add camp_match.platform.db as a new forbidden target rather than re-adding sqlalchemy if it's already there.)
-Tests you must write: none new — tests/architecture/test_layer_boundaries.py from Chunk 2.6 already exercises whatever's in the contracts list; confirm it still passes with the new contracts added.
-Acceptance criteria:
-poetry run lint-imports passes with the extended contract list.
-Manually verify: temporarily import sqlalchemy inside shared_kernel/domain/errors.py, confirm lint-imports fails, then remove the line.
+Objective: The pure business concepts Identity is built around — no FastAPI, no SQLAlchemy, no database, nothing except the shared kernel.
+Files to modify: domain/value_objects.py, domain/entities.py, domain/events.py.
+value_objects.py — two value objects:
+EmailAddress — wraps a single email string. On construction: strip surrounding whitespace, lowercase the whole address, and check it has a basic valid shape (something in the form local-part@domain, domain contains at least one dot) using only the standard library (re is fine — do not add email-validator or any third-party package here; that check happens separately at the API boundary). Reject anything longer than 254 characters. An invalid value raises ValueError at construction — the application layer is responsible for turning that into the right application-level error (see Chunk 5). Two EmailAddress instances are equal if their normalized values match.
+AccountStatus — an enum with exactly three members: ACTIVE, SUSPENDED, DISABLED. Nothing else. (No PENDING_VERIFICATION — see ADR-018.)
+entities.py — one entity, UserAccount:
+Fields: id (reuse the shared-kernel EntityId directly — do not invent a competing identifier type, per the handoff's own instruction; you may alias it as IdentityId = EntityId for readability within this module), email (EmailAddress), password_hash (str — this is the already-hashed, opaque output of the password hasher; the raw password never reaches this class, ever), status (AccountStatus), created_at (datetime).
+Behavior the entity itself should expose (as methods, not free functions elsewhere):
+A way to construct a brand-new account in the ACTIVE state (this is what RegisterAccount will call).
+A way to transition to SUSPENDED/DISABLED/back to ACTIVE that enforces the state machine — reactivating an already-active account or disabling an already-disabled one should be a harmless no-op at the entity level, not an error (the use case layer decides whether to treat that as noteworthy; the entity itself just doesn't do redundant work or throw over it).
+A read-only way to check "is this account allowed to authenticate right now" (true only when status == ACTIVE) — AuthenticateUser will call this rather than comparing the enum itself, so the rule lives in exactly one place.
+events.py — three domain events, each a frozen dataclass extending the shared-kernel DomainEvent (which already supplies event_id and occurred_at): UserRegistered (carries the new account's id and email), AccountDisabled (carries the account id), AccountReactivated (carries the account id). No UserAuthenticated event — see ADR-022.
+Business rules to enforce here, not later: identifier stability (an EntityId, once assigned, never changes for the life of the account — nothing in this class should ever let it be reassigned); raw passwords never touch this file in any form.
+Dependencies you may use: shared-kernel EntityId, shared-kernel DomainEvent, Python stdlib (dataclasses, enum, re, datetime). Nothing else.
+Tests you must write: tests/unit/identity/domain/test_email_address.py (valid addresses normalize correctly and compare equal regardless of case/whitespace; malformed addresses raise ValueError; a 255+ character address is rejected) and tests/unit/identity/domain/test_user_account.py (a new account starts ACTIVE; disabling then reactivating produces ACTIVE again; disabling twice doesn't error; can_authenticate is only true when ACTIVE).
+
+CHUNK 3 — Application Errors
 
 
+Objective: The specific, named ways an Identity use case can fail — each one a subclass of a shared-kernel ApplicationError subtype, not a fresh hierarchy of its own.
+Files to modify: application/errors.py.
+Files to modify outside this module (small, justified — see ADR-023): src/camp_match/shared_kernel/application/errors.py — add one optional class attribute, code: str | None = None, to the base ApplicationError class. This lets any subclass, anywhere in the project, declare a stable machine-readable code without every module inventing its own way to do that.
+The six errors, each mapped to the shared-kernel category that matches what actually went wrong (not just picked to match the HTTP status you'd like):
 
-CHUNK 3.9 — Phase 3 Verification
-Implementation instructions:
-From a clean state (scripts/db_stop.sh then scripts/db_start.sh), run: poetry run alembic upgrade head, poetry run pytest, poetry run ruff check ., poetry run mypy src, poetry run lint-imports — all clean.
-Update AI_state/DATABASE_STATE.md: engine/session lifecycle in place, SqlAlchemyUnitOfWork implemented and satisfying the Phase 2 port, Alembic wired with zero real migrations yet (no business tables), naming/timestamp/soft-deletion conventions documented, test database isolated via transaction rollback.
-Update AI_state/ARCHITECTURE_STATE.md and AI_state/TEST_STATE.md accordingly (integration tests now real, not placeholders).
-Set AI_state/CURRENT_TASK.md to: "Phase 1–3 complete. Awaiting Module 1 (Identity & Authentication) specification from Claude."
-Produce the Completion Report, plus a full flat list of every file created or modified across Phases 1–3 (for me to review).
+Identity error
+Extends
+code
+Meaning
+IdentityAlreadyExists
+ConflictError
+identity_already_exists
+Email is already registered to an account.
+InvalidCredentials
+UnauthorizedError
+invalid_credentials
+Email/password combination didn't check out — used identically whether the email doesn't exist or the password is wrong (see Chunk 5's authentication steps for why). Also reused for an invalid/expired/revoked refresh token — same category of failure.
+AccountSuspended
+ForbiddenError
+account_suspended
+Credentials were valid; the account's status forbids login right now.
+AccountDisabled
+ForbiddenError
+account_disabled
+Same as above, different status.
+IdentityNotFound
+NotFoundError
+identity_not_found
+Looked up by ID and nothing's there.
+InvalidAuthenticationRequest
+ValidationError
+invalid_authentication_request
+Reserved for a business-level input problem Pydantic couldn't have caught (see Chunk 5 — expect this one to see little or no use for now; don't force a use for it).
+Prohibition: do not give any of these classes their own HTTP status code — that mapping is the job of Chunk 8, which reads the shared-kernel category (ConflictError → 409, etc.), not anything Identity-specific. Keeping the status mapping in one place means every future module's errors get consistent HTTP behavior for free.
+Tests you must write: tests/unit/identity/application/test_errors.py — each of the six is an instance of its stated shared-kernel parent, each carries the exact code string from the table above.
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
