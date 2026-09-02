@@ -15,6 +15,8 @@ pydantic-settings = "*"
 structlog = "*"
 sqlalchemy = "^2.0.52"
 asyncpg = "^0.31.0"
+pyjwt = "^2.13.0"
+email-validator = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
@@ -66,10 +68,23 @@ source_modules = ["camp_match.shared_kernel.domain"]
 forbidden_modules = ["fastapi", "sqlalchemy", "camp_match.platform.db", "camp_match.config"]
 
 [[tool.importlinter.contracts]]
-name = "Application must not import platform infrastructure directly"
+name = "Identity Domain must stay framework-free"
 type = "forbidden"
-source_modules = ["camp_match.shared_kernel.application"]
+source_modules = ["camp_match.modules.identity.domain"]
 forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Identity Application must not import frameworks"
+type = "forbidden"
+source_modules = ["camp_match.modules.identity.application"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Identity Adapters are private"
+type = "forbidden"
+source_modules = ["camp_match.modules"]
+excluded_modules = ["camp_match.modules.identity.adapters"]
+forbidden_modules = ["camp_match.modules.identity.adapters"]
 
 [build-system]
 requires = ["poetry-core"]

@@ -5,7 +5,6 @@ from fastapi import APIRouter, Body, Depends, status
 from camp_match.modules.identity.adapters.api import schemas
 from camp_match.modules.identity.adapters.api.dependencies import (
     get_authenticate_user,
-    get_current_identity_id,
     get_get_identity,
     get_logout,
     get_refresh_session,
@@ -27,6 +26,7 @@ from camp_match.modules.identity.application.use_cases.refresh_session import Re
 from camp_match.modules.identity.application.use_cases.register_account import (
     RegisterAccountUseCase,
 )
+from camp_match.platform.security.authentication import get_current_identity_id
 from camp_match.shared_kernel.domain.identifiers import EntityId
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -77,7 +77,7 @@ async def me(
     "/refresh", status_code=status.HTTP_200_OK, response_model=schemas.RefreshResponse
 )
 async def refresh(
-    refresh_data: Annotated[schemas.RefreshRequest, Body(embed=True)],
+    refresh_data: Annotated[schemas.RefreshRequest, Body(...)],
     use_case: Annotated[RefreshSessionUseCase, Depends(get_refresh_session)],
 ) -> schemas.RefreshResponse:
     refresh_request = RefreshRequest(refresh_token=refresh_data.refresh_token)
@@ -91,7 +91,7 @@ async def refresh(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    logout_data: Annotated[schemas.RefreshRequest, Body(embed=True)],
+    logout_data: Annotated[schemas.RefreshRequest, Body(...)],
     use_case: Annotated[LogoutUseCase, Depends(get_logout)],
 ) -> None:
     logout_request = LogoutRequest(refresh_token=logout_data.refresh_token)

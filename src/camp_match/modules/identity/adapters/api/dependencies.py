@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from camp_match.config.settings import Settings, get_settings
@@ -18,22 +18,13 @@ from camp_match.modules.identity.application.use_cases.refresh_session import Re
 from camp_match.modules.identity.application.use_cases.register_account import (
     RegisterAccountUseCase,
 )
-from camp_match.platform.clock import SystemClock
+from camp_match.platform.clock import SystemClock, get_clock
 from camp_match.platform.db.session import get_db_session
 from camp_match.platform.db.unit_of_work import SqlAlchemyUnitOfWork
-from camp_match.platform.in_memory_event_bus import InMemoryEventBus
+from camp_match.platform.event_bus import InMemoryEventBus, get_event_bus
 from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
-from camp_match.shared_kernel.domain.identifiers import EntityId
 
 # Singletons for platform components
-_clock = SystemClock()
-_event_bus = InMemoryEventBus()
-
-def get_clock() -> SystemClock:
-    return _clock
-
-def get_event_bus() -> InMemoryEventBus:
-    return _event_bus
 
 def get_uow(
     session: Annotated[AsyncSession, Depends(get_db_session)]
@@ -80,21 +71,18 @@ def get_authenticate_user(
         session_port=auth
     )
 
-def get_refresh_session(auth: Annotated[JwtAuthenticationSessionAdapter, Depends(get_auth_session)]) -> RefreshSessionUseCase:
-    return RefreshSessionUseCase(session_port=auth)
+def get_refresh_session(
+    auth: Annotated[JwtAuthenticationSessionAdapter, Depends(get_auth_session)],
+    uow: Annotated[UnitOfWork, Depends(get_uow)],
+) -> RefreshSessionUseCase:
+    return RefreshSessionUseCase(session_port=auth, uow=uow)
 
-def get_logout(auth: Annotated[JwtAuthenticationSessionAdapter, Depends(get_auth_session)]) -> LogoutUseCase:
-    return LogoutUseCase(session_port=auth)
+def get_logout(
+    auth: Annotated[JwtAuthenticationSessionAdapter, Depends(get_auth_session)],
+    uow: Annotated[UnitOfWork, Depends(get_uow)],
+) -> LogoutUseCase:
+    return LogoutUseCase(session_port=auth, uow=uow)
 
 def get_get_identity(repo: Annotated[SqlAlchemyIdentityRepository, Depends(get_identity_repository)]) -> GetIdentityByIdUseCase:
     return GetIdentityByIdUseCase(repository=repo)
 
-async def get_current_identity_id(
-    authorization: Annotated[str | None, Header()] = None,
-    auth: Annotated[JwtAuthenticationSessionAdapter, Depends(get_auth_session)] = ...,  # type: ignore
-) -> EntityId:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid token")
-
-    token = authorization.split(" ")[1]
-    return await auth.decode_access_token(token)

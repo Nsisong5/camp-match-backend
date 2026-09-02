@@ -1,0 +1,23 @@
+from dataclasses import dataclass
+from typing import Protocol
+
+from camp_match.modules.profile.domain.entities import Profile
+from camp_match.shared_kernel.domain.identifiers import EntityId
+
+
+@dataclass(frozen=True)
+class IdentitySummary:
+    id: EntityId
+    email: str
+    status: str
+
+class ProfileRepository(Protocol):
+    async def add(self, profile: Profile) -> None: ...
+    async def get_by_identity_id(self, identity_id: EntityId) -> Profile | None: ...
+    async def get_by_id(self, profile_id: EntityId) -> Profile | None: ...
+    async def update_core(self, profile: Profile) -> None: ...
+    async def update_student_extension(self, profile: Profile) -> None: ...
+    async def update_scout_extension(self, profile: Profile) -> None: ...
+
+class IdentityProvider(Protocol):
+    async def get_identity(self, identity_id: EntityId) -> IdentitySummary | None: ...

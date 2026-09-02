@@ -1,9 +1,11 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
-import structlog
-from datetime import datetime, timedelta, timezone
+
+from camp_match.config.settings import get_settings
 from camp_match.modules.identity.adapters.persistence.models import AccountModel
 from camp_match.shared_kernel.domain.identifiers import EntityId
-from camp_match.config.settings import get_settings
+
 
 @pytest.fixture
 def settings():
@@ -53,7 +55,10 @@ async def test_expired_access_token(client, db_session, settings):
     # This requires constructing an expired token and using it.
     # I can use JwtAuthenticationSessionAdapter directly or construct a JWT.
     import jwt
-    from camp_match.modules.identity.adapters.security.jwt_session import JwtAuthenticationSessionAdapter
+
+    from camp_match.modules.identity.adapters.security.jwt_session import (
+        JwtAuthenticationSessionAdapter,
+    )
     
     adapter = JwtAuthenticationSessionAdapter(db_session, settings)
     identity_id = EntityId.new()
@@ -61,8 +66,8 @@ async def test_expired_access_token(client, db_session, settings):
     # Construct expired token
     payload = {
         "sub": str(identity_id),
-        "iat": datetime.now(timezone.utc) - timedelta(days=1),
-        "exp": datetime.now(timezone.utc) - timedelta(hours=1),
+        "iat": datetime.now(UTC) - timedelta(days=1),
+        "exp": datetime.now(UTC) - timedelta(hours=1),
         "type": "access",
     }
     expired_token = jwt.encode(payload, settings.jwt_secret_key, algorithm="HS256")

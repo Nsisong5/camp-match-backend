@@ -9,16 +9,20 @@ from camp_match.modules.identity.application.ports.inbound import (
     TokenResponse,
 )
 from camp_match.modules.identity.application.ports.outbound import AuthenticationSessionPort
+from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
 
 logger = structlog.get_logger()
 
 
 class RefreshSessionUseCase:
-    def __init__(self, session_port: AuthenticationSessionPort) -> None:
+    def __init__(self, session_port: AuthenticationSessionPort, uow: UnitOfWork) -> None:
         self._session_port = session_port
+        self._uow = uow
 
     async def execute(self, request: RefreshRequest) -> TokenResponse:
-        token_pair = await self._session_port.refresh(request.refresh_token)
+        async with self._uow:
+            token_pair = await self._session_port.refresh(request.refresh_token)
+            await self._uow.commit()
 
         logger.info("refresh_succeeded")
 

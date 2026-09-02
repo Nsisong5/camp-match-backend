@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
 
+from fastapi import Request
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -11,9 +11,6 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from camp_match.config.settings import Settings
-
-if TYPE_CHECKING:
-    from fastapi import Request
 
 
 def create_engine(settings: Settings) -> AsyncEngine:

@@ -1,11 +1,15 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
-from camp_match.modules.identity.adapters.security.jwt_session import JwtAuthenticationSessionAdapter
+
+from camp_match.config.settings import Settings, get_settings
+from camp_match.modules.identity.adapters.persistence.models import RefreshTokenModel
+from camp_match.modules.identity.adapters.security.jwt_session import (
+    JwtAuthenticationSessionAdapter,
+)
 from camp_match.modules.identity.application.errors import InvalidCredentials
 from camp_match.shared_kernel.domain.identifiers import EntityId
-from camp_match.config.settings import get_settings, Settings
-from sqlalchemy import select
-from camp_match.modules.identity.adapters.persistence.models import RefreshTokenModel
+
 
 @pytest.fixture
 def settings():
@@ -100,8 +104,8 @@ async def test_refresh_token_expired(db_session, settings):
     identity_id = EntityId.new()
     
     # Manually create an expired token in DB
-    from hashlib import sha256
     import secrets
+    from hashlib import sha256
     raw_token = secrets.token_urlsafe(48)
     token_hash = sha256(raw_token.encode()).hexdigest()
     
@@ -109,8 +113,8 @@ async def test_refresh_token_expired(db_session, settings):
         id=EntityId.new().value,
         account_id=identity_id.value,
         token_hash=token_hash,
-        issued_at=datetime.now(timezone.utc) - timedelta(days=40),
-        expires_at=datetime.now(timezone.utc) - timedelta(days=10),
+        issued_at=datetime.now(UTC) - timedelta(days=40),
+        expires_at=datetime.now(UTC) - timedelta(days=10),
     )
     db_session.add(expired_token)
     await db_session.flush()

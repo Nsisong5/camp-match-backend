@@ -3,6 +3,10 @@ class ApplicationError(Exception):
 
     code: str | None = None
 
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
 
 class NotFoundError(ApplicationError):
     """The requested resource does not exist."""

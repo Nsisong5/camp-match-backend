@@ -1,9 +1,5 @@
 import pytest
-from httpx import ASGITransport, AsyncClient
-from camp_match.modules.identity.adapters.persistence.models import AccountModel, RefreshTokenModel
-from camp_match.modules.identity.domain.entities import UserAccount
-from camp_match.shared_kernel.domain.identifiers import EntityId
-from sqlalchemy import select
+
 
 @pytest.mark.asyncio
 async def test_auth_flow_happy_path(client, db_session):

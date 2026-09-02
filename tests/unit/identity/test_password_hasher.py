@@ -1,5 +1,5 @@
-import pytest
 from camp_match.modules.identity.adapters.security.password_hasher import ScryptPasswordHasher
+
 
 def test_hash_and_verify_success():
     hasher = ScryptPasswordHasher()
