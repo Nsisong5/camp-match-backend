@@ -86,6 +86,38 @@ source_modules = ["camp_match.modules"]
 excluded_modules = ["camp_match.modules.identity.adapters"]
 forbidden_modules = ["camp_match.modules.identity.adapters"]
 
+[[tool.importlinter.contracts]]
+name = "Security Domain must stay framework-free"
+type = "forbidden"
+source_modules = ["camp_match.modules.security.domain"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Security Application must not import frameworks"
+type = "forbidden"
+source_modules = ["camp_match.modules.security.application"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Security Adapters are private"
+type = "forbidden"
+source_modules = ["camp_match.modules"]
+excluded_modules = ["camp_match.modules.security"]
+forbidden_modules = [
+    "camp_match.modules.security.adapters.persistence",
+    "camp_match.modules.security.adapters.profile"
+]
+
+[[tool.importlinter.contracts]]
+name = "Security Profile Adapter boundary"
+type = "forbidden"
+source_modules = ["camp_match.modules.security.adapters.profile"]
+forbidden_modules = [
+    "camp_match.modules.profile.adapters",
+    "camp_match.modules.profile.domain"
+]
+allow_indirect_imports = true
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

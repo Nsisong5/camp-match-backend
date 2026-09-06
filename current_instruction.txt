@@ -1,29 +1,78 @@
+INFO:     127.0.0.1:57278 - "GET /docs HTTP/1.1" 200 OK
+{"path": "http://127.0.0.1:8000/openapi.json", "error": "`TypeAdapter[typing.Annotated[ForwardRef('Annotated[AsyncSession, Depends(get_session)]'), FieldInfo(annotation=NoneType, required=True, alias='session', alias_priority=2, json_schema_extra={})]]` is not fully defined; you should define `typing.Annotated[ForwardRef('Annotated[AsyncSession, Depends(get_session)]'), FieldInfo(annotation=NoneType, required=True, alias='session', alias_priority=2, json_schema_extra={})]` and all referenced types, then call `.rebuild()` on the instance.\n\nFor further information visit https://errors.pydantic.dev/2.13/u/class-not-fully-defined", "event": "unhandled_exception", "level": "error", "timestamp": "2026-09-04T16:04:42.531996Z"}
+INFO:     127.0.0.1:57278 - "GET /openapi.json HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/sdcard/camp_match/src/camp_match/platform/logging/middleware.py", line 18, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/routing.py", line 280, in handle
+    await self.app(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/routing.py", line 65, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/starlette/routing.py", line 62, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/applications.py", line 1110, in openapi
+    schema = self.openapi()
+             ^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/applications.py", line 1086, in openapi
+    self.openapi_schema = get_openapi(
+                          ^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/openapi/utils.py", line 623, in get_openapi
+    field_mapping, definitions = get_definitions(
+                                 ^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/fastapi/_compat/v2.py", line 336, in get_definitions
+    field_mapping, definitions = schema_generator.generate_definitions(inputs=inputs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/pydantic/json_schema.py", line 386, in generate_definitions
+    self.generate_inner(schema)
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/pydantic/json_schema.py", line 466, in generate_inner
+    if 'ref' in schema:
+       ^^^^^^^^^^^^^^^
+  File "<frozen _collections_abc>", line 813, in __contains__
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/pydantic/_internal/_mock_val_ser.py", line 41, in __getitem__
+    return self._get_built().__getitem__(key)
+           ^^^^^^^^^^^^^^^^^
+  File "/root/myweasyprintenv/lib/python3.12/site-packages/pydantic/_internal/_mock_val_ser.py", line 58, in _get_built
+    raise PydanticUserError(self._error_message, code=self._code)
+pydantic.errors.PydanticUserError: `TypeAdapter[typing.Annotated[ForwardRef('Annotated[AsyncSession, Depends(get_session)]'), FieldInfo(annotation=NoneType, required=True, alias='session', alias_priority=2, json_schema_extra={})]]` is not fully defined; you should define `typing.Annotated[ForwardRef('Annotated[AsyncSession, Depends(get_session)]'), FieldInfo(annotation=NoneType, required=True, alias='session', alias_priority=2, json_schema_extra={})]` and all referenced types, then call `.rebuild()` on the instance.
 
-I need you to investigate why student update is not working 
-when I sent this data 
-
-{
-"display_name": "Precious stone",
-"profile_type": "STUDENT",
-"bio": "I just changed my bio",
-"phone_number": "07013218324",
-"avatar_url": "no avater yet",
-"student_details": {
-"university_name": "Unical",
-"department": "Computer Science",
-"budget_max_naira": 200000,
- "budget_min_naira": 20000
-}
-}
-
-I got this response below on the API client 
-
-{"id": "daf6d493-7b88-4df3-a9d0-8356a5dfad41", "identity_id": "635867f9-3b3e-4433-b436-efba73ab2051", "profile_type": "STUDENT", "display_name": "Precious stone", "completeness_percentage": 50, "bio": "I just changed my bio", "phone_number": "07013218324", "avatar_url": "no avater yet", "student_details": { "university_name": "My University", "department": "Computer Science", "budget_min_naira": null, "budget_max_naira": null, "preferred_accommodation_type": null, "cleanliness_preference": null, "sleep_schedule": null }, "scout_details": null }
-
-and this on the terminal 
-
-INFO:     127.0.0.1:46460 - "PATCH /api/v1/profiles/me/student HTTP/1.1" 200 OK
-{"identity_id": "635867f9-3b3e-4433-b436-efba73ab2051", "profile_id": "daf6d493-7b88-4df3-a9d0-8356a5dfad41", "event": "student_profile_updated", "request_id": "cade5c94-8cae-4226-936c-4da1537f48b8", "level": "info", "timestamp": "2026-09-02T15:53:54.107956Z"}
-INFO:     127.0.0.1:46462 - "PATCH /api/v1/profiles/me/student HTTP/1.1" 200 OK
-
-the message confirmed ok but the update never actually gets done. investigate 
+For further information visit https://errors.pydantic.dev/2.13/u/class-not-fully-defined

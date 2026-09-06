@@ -9,6 +9,8 @@ from camp_match.modules.identity.adapters.api.dependencies import (
     get_logout,
     get_refresh_session,
     get_register_account,
+    get_disable_account,
+    get_reactivate_account,
 )
 from camp_match.modules.identity.application.ports.inbound import (
     AuthenticationRequest,
@@ -16,16 +18,21 @@ from camp_match.modules.identity.application.ports.inbound import (
     LogoutRequest,
     RefreshRequest,
     RegistrationRequest,
+    UpdateStatusRequest,
 )
 from camp_match.modules.identity.application.use_cases.authenticate_user import (
     AuthenticateUserUseCase,
 )
+from camp_match.modules.identity.application.use_cases.disable_account import DisableAccountUseCase
 from camp_match.modules.identity.application.use_cases.get_identity import GetIdentityByIdUseCase
 from camp_match.modules.identity.application.use_cases.logout import LogoutUseCase
+from camp_match.modules.identity.application.use_cases.reactivate_account import ReactivateAccountUseCase
 from camp_match.modules.identity.application.use_cases.refresh_session import RefreshSessionUseCase
 from camp_match.modules.identity.application.use_cases.register_account import (
     RegisterAccountUseCase,
 )
+from camp_match.modules.security.adapters.api.dependencies import require_permission
+from camp_match.modules.security.domain.value_objects import Permission
 from camp_match.platform.security.authentication import get_current_identity_id
 from camp_match.shared_kernel.domain.identifiers import EntityId
 
@@ -96,3 +103,23 @@ async def logout(
 ) -> None:
     logout_request = LogoutRequest(refresh_token=logout_data.refresh_token)
     await use_case.execute(logout_request)
+
+@router.post("/{identity_id}/disable", response_model=schemas.MeResponse)
+async def disable_account(
+    identity_id: str,
+    use_case: Annotated[DisableAccountUseCase, Depends(get_disable_account)],
+    _ = require_permission(Permission.ADMIN_USERS_MANAGE)
+) -> schemas.MeResponse:
+    request = UpdateStatusRequest(identity_id=identity_id)
+    identity = await use_case.execute(request)
+    return schemas.MeResponse(id=identity.id, email=identity.email, status=identity.status)
+
+@router.post("/{identity_id}/reactivate", response_model=schemas.MeResponse)
+async def reactivate_account(
+    identity_id: str,
+    use_case: Annotated[ReactivateAccountUseCase, Depends(get_reactivate_account)],
+    _ = require_permission(Permission.ADMIN_USERS_MANAGE)
+) -> schemas.MeResponse:
+    request = UpdateStatusRequest(identity_id=identity_id)
+    identity = await use_case.execute(request)
+    return schemas.MeResponse(id=identity.id, email=identity.email, status=identity.status)

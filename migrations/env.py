@@ -9,6 +9,10 @@ from camp_match.config.settings import get_settings
 
 # Ensure all models are imported so Alembic registers them on Base.metadata
 from camp_match.platform.db.base import Base
+import camp_match.modules.identity.adapters.persistence.models
+import camp_match.modules.profile.adapters.persistence.models
+import camp_match.modules.security.adapters.persistence.models
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
