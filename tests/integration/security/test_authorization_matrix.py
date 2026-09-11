@@ -1,12 +1,15 @@
-import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-from camp_match.modules.security.application.ports.inbound import AuthorizationRequest
-from camp_match.modules.security.application.use_cases.authorize_action import AuthorizeActionUseCase
-from camp_match.modules.security.adapters.persistence.repository import SqlAlchemyRoleRepository
-from camp_match.modules.security.adapters.profile.profile_provider import InProcessProfileProvider
-from camp_match.modules.security.domain.value_objects import Role, Permission, AuthorizationOutcome
-from camp_match.shared_kernel.domain.identifiers import EntityId
 from unittest.mock import AsyncMock
+
+import pytest
+
+from camp_match.modules.security.adapters.persistence.repository import SqlAlchemyRoleRepository
+from camp_match.modules.security.application.ports.inbound import AuthorizationRequest
+from camp_match.modules.security.application.use_cases.authorize_action import (
+    AuthorizeActionUseCase,
+)
+from camp_match.modules.security.domain.value_objects import AuthorizationOutcome, Permission, Role
+from camp_match.shared_kernel.domain.identifiers import EntityId
+
 
 @pytest.mark.asyncio
 async def test_authorization_matrix(db_session):

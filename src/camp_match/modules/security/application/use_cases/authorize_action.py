@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import structlog
-from typing import Optional
 
 from camp_match.modules.security.application.ports.inbound import AuthorizationRequest
-from camp_match.modules.security.application.ports.outbound import RoleRepository, ProfileProvider
-from camp_match.modules.security.domain.policy import permissions_for, is_ownership_scoped
+from camp_match.modules.security.application.ports.outbound import ProfileProvider, RoleRepository
+from camp_match.modules.security.domain.policy import is_ownership_scoped, permissions_for
 from camp_match.modules.security.domain.value_objects import (
     AuthorizationDecision,
     AuthorizationOutcome,

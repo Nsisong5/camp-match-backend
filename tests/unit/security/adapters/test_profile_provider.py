@@ -1,10 +1,13 @@
-import pytest
 from unittest.mock import AsyncMock
-from camp_match.modules.security.adapters.profile.profile_provider import InProcessProfileProvider
+
+import pytest
+
 from camp_match.modules.profile.application.errors import ProfileNotFound
 from camp_match.modules.profile.application.ports.inbound import ProfileResponse
+from camp_match.modules.security.adapters.profile.profile_provider import InProcessProfileProvider
 from camp_match.modules.security.domain.value_objects import Role
 from camp_match.shared_kernel.domain.identifiers import EntityId
+
 
 @pytest.mark.asyncio
 async def test_in_process_profile_provider_maps_student():

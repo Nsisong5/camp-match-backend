@@ -15,6 +15,7 @@ get_settings.cache_clear()
 
 from camp_match.app import create_app, lifespan
 from camp_match.platform.db.base import Base
+from camp_match.platform.db.session import get_db_session
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -30,16 +31,23 @@ async def setup_test_db():
 
     await engine.dispose()
 
-    # Run migrations/create tables on test DB
-    test_engine = create_async_engine(settings.database_url)
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Import models so Base.metadata knows about them
 
     yield
 
 
 @pytest.fixture
-async def db_session(setup_test_db):
+async def clear_db(setup_test_db):
+    settings = get_settings()
+    test_engine = create_async_engine(settings.database_url)
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    await test_engine.dispose()
+    yield
+
+@pytest.fixture
+async def db_session(setup_test_db, clear_db):
     settings = get_settings()
     test_engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
@@ -51,10 +59,17 @@ async def db_session(setup_test_db):
 
 
 @pytest.fixture
-async def client():
+async def client(db_session):
     app = create_app()
+    
+    # Override the DB session to use the test-managed transaction
+    app.dependency_overrides[get_db_session] = lambda: db_session
+
     # Manually trigger the lifespan of the application to setup db engine/session factory
     async with lifespan(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
+    
+    # Clear overrides after the test
+    app.dependency_overrides.clear()

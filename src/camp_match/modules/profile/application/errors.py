@@ -5,6 +5,7 @@ from camp_match.shared_kernel.application.errors import (
     ValidationError,
 )
 
+
 class ProfileNotFound(NotFoundError):
     def __init__(self, message: str = "Profile not found.") -> None:
         super().__init__(message=message)

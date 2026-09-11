@@ -23,12 +23,16 @@ async def test_no_password_hash_in_responses(client, db_session):
 
 @pytest.mark.asyncio
 async def test_suspended_account_forbidden(client, db_session):
+    from camp_match.modules.identity.adapters.security.password_hasher import ScryptPasswordHasher
+    hasher = ScryptPasswordHasher()
+    pwd_hash = hasher.hash("password123")
+    
     # Manually create suspended user
     user_id = EntityId.new().value
     user = AccountModel(
         id=user_id,
         email="suspended@example.com",
-        password_hash="somehash",
+        password_hash=pwd_hash,
         status="SUSPENDED"
     )
     db_session.add(user)

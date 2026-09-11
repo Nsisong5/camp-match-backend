@@ -5,12 +5,12 @@ from fastapi import APIRouter, Body, Depends, status
 from camp_match.modules.identity.adapters.api import schemas
 from camp_match.modules.identity.adapters.api.dependencies import (
     get_authenticate_user,
+    get_disable_account,
     get_get_identity,
     get_logout,
+    get_reactivate_account,
     get_refresh_session,
     get_register_account,
-    get_disable_account,
-    get_reactivate_account,
 )
 from camp_match.modules.identity.application.ports.inbound import (
     AuthenticationRequest,
@@ -26,7 +26,9 @@ from camp_match.modules.identity.application.use_cases.authenticate_user import 
 from camp_match.modules.identity.application.use_cases.disable_account import DisableAccountUseCase
 from camp_match.modules.identity.application.use_cases.get_identity import GetIdentityByIdUseCase
 from camp_match.modules.identity.application.use_cases.logout import LogoutUseCase
-from camp_match.modules.identity.application.use_cases.reactivate_account import ReactivateAccountUseCase
+from camp_match.modules.identity.application.use_cases.reactivate_account import (
+    ReactivateAccountUseCase,
+)
 from camp_match.modules.identity.application.use_cases.refresh_session import RefreshSessionUseCase
 from camp_match.modules.identity.application.use_cases.register_account import (
     RegisterAccountUseCase,

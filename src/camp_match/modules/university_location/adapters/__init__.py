@@ -1,0 +1,1 @@
+"""University Location adapters layer."""

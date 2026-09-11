@@ -1,0 +1,1 @@
+"""University Location unit tests."""

@@ -12,14 +12,16 @@ from camp_match.modules.identity.adapters.security.password_hasher import Scrypt
 from camp_match.modules.identity.application.use_cases.authenticate_user import (
     AuthenticateUserUseCase,
 )
+from camp_match.modules.identity.application.use_cases.disable_account import DisableAccountUseCase
 from camp_match.modules.identity.application.use_cases.get_identity import GetIdentityByIdUseCase
 from camp_match.modules.identity.application.use_cases.logout import LogoutUseCase
+from camp_match.modules.identity.application.use_cases.reactivate_account import (
+    ReactivateAccountUseCase,
+)
 from camp_match.modules.identity.application.use_cases.refresh_session import RefreshSessionUseCase
 from camp_match.modules.identity.application.use_cases.register_account import (
     RegisterAccountUseCase,
 )
-from camp_match.modules.identity.application.use_cases.disable_account import DisableAccountUseCase
-from camp_match.modules.identity.application.use_cases.reactivate_account import ReactivateAccountUseCase
 from camp_match.platform.clock import SystemClock, get_clock
 from camp_match.platform.db.session import get_db_session
 from camp_match.platform.db.unit_of_work import SqlAlchemyUnitOfWork

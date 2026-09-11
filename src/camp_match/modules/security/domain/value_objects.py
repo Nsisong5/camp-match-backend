@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import FrozenSet
 
 from camp_match.shared_kernel.domain.identifiers import EntityId
 
@@ -16,6 +15,7 @@ class Role(Enum):
 
 class Permission(Enum):
     ADMIN_USERS_MANAGE = "admin.users.manage"
+    UNIVERSITY_MANAGE = "university.manage"
     EXAMPLE_TEST_PERMISSION = "test.ownership.scoped"  # Test-only
 
 
@@ -35,8 +35,8 @@ class AuthorizationDecision:
 @dataclass(frozen=True)
 class Principal:
     identity_id: EntityId
-    roles: FrozenSet[Role]
+    roles: frozenset[Role]
 
     @classmethod
-    def create(cls, identity_id: EntityId, roles: FrozenSet[Role]) -> Principal:
+    def create(cls, identity_id: EntityId, roles: frozenset[Role]) -> Principal:
         return cls(identity_id=identity_id, roles=roles)

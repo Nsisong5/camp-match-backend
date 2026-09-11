@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.api
 @pytest.mark.asyncio
 async def test_profile_security(client: AsyncClient, db_session):

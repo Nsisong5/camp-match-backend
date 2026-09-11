@@ -1,9 +1,12 @@
-import pytest
 import uuid
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from camp_match.modules.security.adapters.persistence.repository import SqlAlchemyRoleRepository
 from camp_match.modules.security.domain.value_objects import Role
 from camp_match.shared_kernel.domain.identifiers import EntityId
+
 
 @pytest.mark.asyncio
 async def test_role_repository_persistence(db_session: AsyncSession):

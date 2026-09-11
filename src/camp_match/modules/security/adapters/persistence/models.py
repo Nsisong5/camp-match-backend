@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, String, UniqueConstraint, DateTime
+from sqlalchemy import Column, DateTime, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
+
 from camp_match.platform.db.base import Base
+
 
 class SecurityUserRoleModel(Base):
     __tablename__ = "security_user_roles"

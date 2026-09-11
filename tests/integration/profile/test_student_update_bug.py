@@ -1,4 +1,6 @@
+import uuid
 from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +13,7 @@ from camp_match.modules.profile.domain.value_objects import (
     StudentProfileDetails,
 )
 from camp_match.shared_kernel.domain.identifiers import EntityId
+
 
 async def _create_test_identity(db_session: AsyncSession, email: str) -> EntityId:
     identity_repo = SqlAlchemyIdentityRepository(db_session)
@@ -29,7 +32,8 @@ async def _create_test_identity(db_session: AsyncSession, email: str) -> EntityI
 @pytest.mark.asyncio
 async def test_repository_update_student_extension_persistence(db_session: AsyncSession):
     # Setup
-    identity_id = await _create_test_identity(db_session, "test@example.com")
+    unique_email = f"test_{uuid.uuid4()}@example.com"
+    identity_id = await _create_test_identity(db_session, unique_email)
     profile_repo = SqlAlchemyProfileRepository(db_session)
     profile_id = EntityId.new()
     

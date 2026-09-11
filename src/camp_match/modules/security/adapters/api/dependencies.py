@@ -1,20 +1,30 @@
 from __future__ import annotations
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from camp_match.modules.profile.adapters.persistence.repository import SqlAlchemyProfileRepository
+from camp_match.modules.profile.application.use_cases.get_current_user_profile import (
+    GetCurrentUserProfileUseCase,
+)
 from camp_match.modules.security.adapters.persistence.repository import SqlAlchemyRoleRepository
 from camp_match.modules.security.adapters.profile.profile_provider import InProcessProfileProvider
-from camp_match.modules.security.application.use_cases.authorize_action import AuthorizeActionUseCase
-from camp_match.modules.security.domain.value_objects import AuthorizationOutcome, Permission, Principal, Role
+from camp_match.modules.security.application.use_cases.authorize_action import (
+    AuthorizeActionUseCase,
+)
+from camp_match.modules.security.domain.value_objects import (
+    AuthorizationOutcome,
+    Permission,
+    Principal,
+    Role,
+)
 from camp_match.platform.db.session import get_db_session as get_session
 from camp_match.platform.security.authentication import get_current_identity_id
 from camp_match.shared_kernel.domain.identifiers import EntityId
-from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
-from camp_match.modules.profile.application.use_cases.get_current_user_profile import GetCurrentUserProfileUseCase
-from camp_match.modules.profile.adapters.persistence.repository import SqlAlchemyProfileRepository
+
 
 async def get_current_principal(
     identity_id: Annotated[EntityId, Depends(get_current_identity_id)],

@@ -1,11 +1,10 @@
-import pytest
 from camp_match.modules.security.application.errors import (
-    UnauthorizedError,
-    SecurityForbiddenError,
-    UnknownPermissionError,
     InvalidAuthorizationContextError,
-    RoleNotFoundError,
     PolicyViolationError,
+    RoleNotFoundError,
+    SecurityForbiddenError,
+    UnauthorizedError,
+    UnknownPermissionError,
 )
 from camp_match.shared_kernel.application.errors import (
     ApplicationError,
@@ -13,6 +12,7 @@ from camp_match.shared_kernel.application.errors import (
     NotFoundError,
     ValidationError,
 )
+
 
 def test_error_codes():
     assert UnauthorizedError("msg").code == "unauthenticated"

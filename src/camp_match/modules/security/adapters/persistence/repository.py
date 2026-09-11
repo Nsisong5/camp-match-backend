@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
-from typing import FrozenSet
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,13 +17,14 @@ class SqlAlchemyRoleRepository(RoleRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get_assigned_roles(self, identity_id: EntityId) -> FrozenSet[Role]:
+    async def get_assigned_roles(self, identity_id: EntityId) -> frozenset[Role]:
         stmt = select(SecurityUserRoleModel.role).where(
             SecurityUserRoleModel.identity_id == identity_id.value
         )
         result = await self._session.execute(stmt)
         roles = result.scalars().all()
         return frozenset(Role[role] for role in roles)
+
 
     async def assign_role(self, identity_id: EntityId, role: Role) -> None:
         model = SecurityUserRoleModel(

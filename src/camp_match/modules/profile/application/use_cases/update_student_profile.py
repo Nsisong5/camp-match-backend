@@ -1,9 +1,13 @@
-from camp_match.modules.profile.application.ports.inbound import UpdateStudentProfileRequest, ProfileResponse
-from camp_match.modules.profile.application.ports.outbound import ProfileRepository
+import structlog
+
 from camp_match.modules.profile.application.errors import ProfileNotFound, UnsupportedProfileType
+from camp_match.modules.profile.application.ports.inbound import (
+    ProfileResponse,
+    UpdateStudentProfileRequest,
+)
+from camp_match.modules.profile.application.ports.outbound import ProfileRepository
 from camp_match.modules.profile.domain.value_objects import StudentProfileDetails
 from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
-import structlog
 
 logger = structlog.get_logger()
 

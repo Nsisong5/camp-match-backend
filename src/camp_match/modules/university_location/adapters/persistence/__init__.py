@@ -1,0 +1,1 @@
+"""University Location persistence adapters."""

@@ -1,6 +1,6 @@
-import pytest
-from camp_match.modules.security.domain.value_objects import Role, Permission, AuthorizationOutcome
 from camp_match.modules.security.domain.policy import _ROLE_PERMISSIONS
+from camp_match.modules.security.domain.value_objects import AuthorizationOutcome, Permission, Role
+
 
 def test_role_permissions_mapping():
     assert Permission.ADMIN_USERS_MANAGE in _ROLE_PERMISSIONS[Role.ADMIN]

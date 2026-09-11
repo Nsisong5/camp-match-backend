@@ -1,8 +1,12 @@
-from camp_match.modules.profile.application.ports.inbound import UpdateProfileRequest, ProfileResponse
-from camp_match.modules.profile.application.ports.outbound import ProfileRepository
-from camp_match.modules.profile.application.errors import ProfileNotFound
-from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
 import structlog
+
+from camp_match.modules.profile.application.errors import ProfileNotFound
+from camp_match.modules.profile.application.ports.inbound import (
+    ProfileResponse,
+    UpdateProfileRequest,
+)
+from camp_match.modules.profile.application.ports.outbound import ProfileRepository
+from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
 
 logger = structlog.get_logger()
 

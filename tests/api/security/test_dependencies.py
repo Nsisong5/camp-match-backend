@@ -1,6 +1,7 @@
 import pytest
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+
 from camp_match.modules.security.adapters.api.dependencies import require_permission
 from camp_match.modules.security.domain.value_objects import Permission
 from camp_match.platform.security.authentication import get_current_identity_id

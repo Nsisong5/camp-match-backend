@@ -118,6 +118,27 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+[[tool.importlinter.contracts]]
+name = "University Location Domain must stay framework-free"
+type = "forbidden"
+source_modules = ["camp_match.modules.university_location.domain"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "University Location Application must not import frameworks"
+type = "forbidden"
+source_modules = ["camp_match.modules.university_location.application"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "University Location Adapters are private"
+type = "forbidden"
+source_modules = ["camp_match.modules"]
+excluded_modules = ["camp_match.modules.university_location"]
+forbidden_modules = [
+    "camp_match.modules.university_location.adapters.persistence"
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

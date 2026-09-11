@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from camp_match.modules.profile.application.errors import ProfileNotFound
 from camp_match.modules.profile.application.ports.inbound import GetProfileRequest
 from camp_match.modules.profile.application.use_cases.get_current_user_profile import (
@@ -16,7 +14,7 @@ class InProcessProfileProvider(ProfileProvider):
     def __init__(self, use_case: GetCurrentUserProfileUseCase) -> None:
         self._use_case = use_case
 
-    async def get_profile_type(self, identity_id: EntityId) -> Optional[str]:
+    async def get_profile_type(self, identity_id: EntityId) -> str | None:
         try:
             profile = await self._use_case.execute(GetProfileRequest(identity_id=identity_id))
             # Profile module returns type as a string
