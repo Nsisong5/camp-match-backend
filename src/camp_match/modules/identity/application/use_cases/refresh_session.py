@@ -24,7 +24,8 @@ class RefreshSessionUseCase:
             token_pair = await self._session_port.refresh(request.refresh_token)
             await self._uow.commit()
 
-        logger.info("refresh_succeeded")
+        logger.info("refresh_succeeded", access_token_present=bool(token_pair.access_token))
+        print(f"DEBUG: TokenPair: {token_pair}")
 
         return TokenResponse(
             access_token=token_pair.access_token,

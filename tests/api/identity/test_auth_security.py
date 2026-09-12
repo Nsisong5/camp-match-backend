@@ -63,8 +63,9 @@ async def test_expired_access_token(client, db_session, settings):
     from camp_match.modules.identity.adapters.security.jwt_session import (
         JwtAuthenticationSessionAdapter,
     )
+    from camp_match.platform.db.unit_of_work import SqlAlchemyUnitOfWork
     
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, SqlAlchemyUnitOfWork(db_session))
     identity_id = EntityId.new()
     
     # Construct expired token

@@ -11,6 +11,7 @@ from camp_match.config.settings import Settings
 from camp_match.modules.identity.adapters.persistence.models import RefreshTokenModel
 from camp_match.modules.identity.application.errors import InvalidCredentials
 from camp_match.modules.identity.application.ports.outbound import TokenPair
+from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
 from camp_match.shared_kernel.domain.identifiers import EntityId
 
 if TYPE_CHECKING:
@@ -20,17 +21,20 @@ logger = structlog.get_logger()
 
 
 class JwtAuthenticationSessionAdapter:
-    def __init__(self, session: "AsyncSession", settings: Settings) -> None:
+    def __init__(self, session: "AsyncSession", settings: Settings, unit_of_work: UnitOfWork) -> None:
         self._session = session
         self._settings = settings
+        self._unit_of_work = unit_of_work
 
     async def issue_tokens(self, identity_id: EntityId) -> TokenPair:
         now = datetime.now(UTC)
         access_token = self._create_access_token(identity_id, now)
 
         refresh_token, token_model = await self._create_refresh_token(identity_id, now)
-        self._session.add(token_model)
-        await self._session.flush()
+        
+        async with self._unit_of_work:
+            self._session.add(token_model)
+            await self._unit_of_work.commit()
 
         return TokenPair(
             access_token=access_token,
@@ -56,19 +60,23 @@ class JwtAuthenticationSessionAdapter:
                 "refresh_token_reused",
                 token_hash=refresh_token_hash,
                 account_id=str(token_model.account_id),
+                revoked_at=str(token_model.revoked_at),
             )
-            raise InvalidCredentials("Invalid credentials.") from None
+            raise InvalidCredentials("Invalid credentials.")
 
         if token_model.expires_at < now:
             logger.warning(
                 "refresh_token_expired",
                 token_hash=refresh_token_hash,
                 account_id=str(token_model.account_id),
+                expires_at=str(token_model.expires_at),
+                now=str(now),
             )
-            raise InvalidCredentials("Invalid credentials.") from None
+            raise InvalidCredentials("Invalid credentials.")
 
         # Revoke old token
         token_model.revoked_at = now
+        logger.info("refresh_token_rotated", token_hash=refresh_token_hash)
 
         # Issue new tokens
         identity_id = EntityId(token_model.account_id)
@@ -78,8 +86,9 @@ class JwtAuthenticationSessionAdapter:
         # Link rotation
         token_model.replaced_by_id = new_token_model.id
         
-        self._session.add(new_token_model)
-        await self._session.flush()
+        async with self._unit_of_work:
+            self._session.add(new_token_model)
+            await self._unit_of_work.commit()
 
         return TokenPair(
             access_token=access_token,
@@ -96,6 +105,8 @@ class JwtAuthenticationSessionAdapter:
 
         if token_model and not token_model.revoked_at:
             token_model.revoked_at = datetime.now(UTC)
+            async with self._unit_of_work:
+                await self._unit_of_work.commit()
             logger.info("refresh_token_revoked", token_hash=refresh_token_hash)
         else:
             logger.info("refresh_token_revocation_noop", token_hash=refresh_token_hash)

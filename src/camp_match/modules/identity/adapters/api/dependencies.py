@@ -46,8 +46,9 @@ def get_password_hasher() -> ScryptPasswordHasher:
 def get_auth_session(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings)],
+    uow: Annotated[UnitOfWork, Depends(get_uow)],
 ) -> JwtAuthenticationSessionAdapter:
-    return JwtAuthenticationSessionAdapter(session, settings)
+    return JwtAuthenticationSessionAdapter(session, settings, uow)
 
 def get_register_account(
     repo: Annotated[SqlAlchemyIdentityRepository, Depends(get_identity_repository)],

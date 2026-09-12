@@ -7,6 +7,7 @@ from camp_match.modules.identity.adapters.persistence.models import RefreshToken
 from camp_match.modules.identity.adapters.security.jwt_session import (
     JwtAuthenticationSessionAdapter,
 )
+from camp_match.platform.db.unit_of_work import SqlAlchemyUnitOfWork
 from camp_match.modules.identity.application.errors import InvalidCredentials
 from camp_match.shared_kernel.domain.identifiers import EntityId
 
@@ -15,9 +16,13 @@ from camp_match.shared_kernel.domain.identifiers import EntityId
 def settings():
     return get_settings()
 
+@pytest.fixture
+def uow(db_session):
+    return SqlAlchemyUnitOfWork(db_session)
+
 @pytest.mark.integration
-async def test_issue_and_decode_access_token(db_session, settings):
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+async def test_issue_and_decode_access_token(db_session, settings, uow):
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, uow)
     identity_id = EntityId.new()
     
     tokens = await adapter.issue_tokens(identity_id)
@@ -30,8 +35,8 @@ async def test_issue_and_decode_access_token(db_session, settings):
     assert decoded_id == identity_id
 
 @pytest.mark.integration
-async def test_refresh_token_rotation(db_session, settings):
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+async def test_refresh_token_rotation(db_session, settings, uow):
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, uow)
     identity_id = EntityId.new()
     
     tokens = await adapter.issue_tokens(identity_id)
@@ -51,8 +56,8 @@ async def test_refresh_token_rotation(db_session, settings):
         await adapter.refresh(old_refresh_token)
 
 @pytest.mark.integration
-async def test_revoke_token(db_session, settings):
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+async def test_revoke_token(db_session, settings, uow):
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, uow)
     identity_id = EntityId.new()
     
     tokens = await adapter.issue_tokens(identity_id)
@@ -63,8 +68,8 @@ async def test_revoke_token(db_session, settings):
         await adapter.refresh(tokens.refresh_token)
 
 @pytest.mark.integration
-async def test_revoke_is_idempotent(db_session, settings):
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+async def test_revoke_is_idempotent(db_session, settings, uow):
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, uow)
     identity_id = EntityId.new()
     
     tokens = await adapter.issue_tokens(identity_id)
@@ -73,13 +78,13 @@ async def test_revoke_is_idempotent(db_session, settings):
     await adapter.revoke(tokens.refresh_token) # Should not raise
 
 @pytest.mark.integration
-async def test_decode_expired_token(db_session, settings):
+async def test_decode_expired_token(db_session, settings, uow):
     # Shorten expiry for test
     custom_settings = Settings(
         jwt_secret_key=settings.jwt_secret_key,
         jwt_access_token_expire_minutes=-1 # already expired
     )
-    adapter = JwtAuthenticationSessionAdapter(db_session, custom_settings)
+    adapter = JwtAuthenticationSessionAdapter(db_session, custom_settings, uow)
     identity_id = EntityId.new()
     
     tokens = await adapter.issue_tokens(identity_id)
@@ -88,8 +93,8 @@ async def test_decode_expired_token(db_session, settings):
         await adapter.decode_access_token(tokens.access_token)
 
 @pytest.mark.integration
-async def test_decode_tampered_token(db_session, settings):
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+async def test_decode_tampered_token(db_session, settings, uow):
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, uow)
     identity_id = EntityId.new()
     
     tokens = await adapter.issue_tokens(identity_id)
@@ -99,8 +104,8 @@ async def test_decode_tampered_token(db_session, settings):
         await adapter.decode_access_token(tampered_token)
 
 @pytest.mark.integration
-async def test_refresh_token_expired(db_session, settings):
-    adapter = JwtAuthenticationSessionAdapter(db_session, settings)
+async def test_refresh_token_expired(db_session, settings, uow):
+    adapter = JwtAuthenticationSessionAdapter(db_session, settings, uow)
     identity_id = EntityId.new()
     
     # Manually create an expired token in DB
