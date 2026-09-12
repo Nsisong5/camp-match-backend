@@ -33,3 +33,35 @@ AI_state/
 current_instruction.txt
 
 admin.py
+cin.md
+
+
+# AI and Instruction files
+AI_instructions/
+current_instruction.txt
+
+# Dump text files
+all_files_*.txt
+phase1*.txt
+
+# Diagnostic/Scratch scripts
+diagnose_*.py
+reproduce_*.py
+test_*.py
+
+
+
+
+# Ignore local text dumps
+*.txt
+!requirements.txt  # (if you use one)
+
+# Ignore root-level test/debug scripts
+diagnose_*.py
+reproduce_*.py
+test_*.py
+
+# Local state
+AI_state/
+
+
