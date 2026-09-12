@@ -63,7 +63,7 @@ async def list_universities(
     name_query: str | None = None,
     state_region: str | None = None,
     include_inactive: bool = False,
-    repo: Annotated[UniversityRepository, Depends(dependencies.get_university_repository)] = None, # type: ignore
+    repo: UniversityRepository = Depends(dependencies.get_university_repository),
 ) -> schemas.UniversityListResponseSchema:
     use_case = ListUniversitiesUseCase(repo)
     request = ListUniversitiesRequest(
@@ -73,6 +73,7 @@ async def list_universities(
         include_inactive=include_inactive,
     )
     resp = await use_case.execute(request)
+    print(f"DEBUG: Use case returned {len(resp.items)} items.")
     return schemas.UniversityListResponseSchema.model_validate(resp)
 
 
@@ -118,7 +119,7 @@ async def list_campuses_for_university(
     name_query: str | None = None,
     state_region: str | None = None,
     include_inactive: bool = False,
-    campus_repo: Annotated[CampusRepository, Depends(dependencies.get_campus_repository)] = None, # type: ignore
+    campus_repo: CampusRepository = Depends(dependencies.get_campus_repository),
 ) -> schemas.CampusListResponseSchema:
     use_case = ListCampusesUseCase(campus_repo)
     request = ListCampusesRequest(

@@ -4,6 +4,7 @@ from camp_match.modules.university_location.application.ports.inbound import (
     UniversityResponse,
 )
 from camp_match.modules.university_location.application.ports.outbound import UniversityRepository
+from camp_match.modules.university_location.domain.value_objects import clean_name, normalize_name
 from camp_match.shared_kernel.application.pagination import Page
 
 
@@ -12,10 +13,13 @@ class ListUniversitiesUseCase(ListUniversities):
         self._repository = repository
 
     async def execute(self, request: ListUniversitiesRequest) -> Page[UniversityResponse]:
+        name_query = normalize_name(request.name_query) if request.name_query else None
+        state_region = clean_name(request.state_region) if request.state_region else None
+
         page = await self._repository.list_universities(
             page_request=request.page_request,
-            name_query=request.name_query,
-            state_region=request.state_region,
+            name_query=name_query,
+            state_region=state_region,
             include_inactive=request.include_inactive,
         )
         
