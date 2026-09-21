@@ -47,15 +47,15 @@ async def clear_db(setup_test_db):
     yield
 
 @pytest.fixture
-async def db_session(setup_test_db, clear_db):
+def session_factory():
     settings = get_settings()
     test_engine = create_async_engine(settings.database_url)
-    session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
+    return async_sessionmaker(test_engine, expire_on_commit=False)
 
+@pytest.fixture
+async def db_session(setup_test_db, clear_db, session_factory):
     async with session_factory() as session:
         yield session
-
-    await test_engine.dispose()
 
 
 @pytest.fixture

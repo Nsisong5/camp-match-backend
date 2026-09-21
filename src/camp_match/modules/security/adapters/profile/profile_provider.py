@@ -17,11 +17,11 @@ class InProcessProfileProvider(ProfileProvider):
     async def get_profile_type(self, identity_id: EntityId) -> str | None:
         try:
             profile = await self._use_case.execute(GetProfileRequest(identity_id=identity_id))
-            # Profile module returns type as a string
+            # Profile module returns type as an Enum member
             profile_type = profile.profile_type
-            if profile_type == "STUDENT":
+            if profile_type.name == "STUDENT":
                 return Role.STUDENT.name
-            elif profile_type == "SCOUT":
+            elif profile_type.name == "SCOUT":
                 return Role.SCOUT.name
             return None
         except ProfileNotFound:

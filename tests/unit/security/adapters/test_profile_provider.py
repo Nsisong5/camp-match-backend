@@ -9,13 +9,15 @@ from camp_match.modules.security.domain.value_objects import Role
 from camp_match.shared_kernel.domain.identifiers import EntityId
 
 
+from camp_match.modules.profile.domain.value_objects import ProfileType
+
 @pytest.mark.asyncio
 async def test_in_process_profile_provider_maps_student():
     mock_use_case = AsyncMock()
     mock_use_case.execute.return_value = ProfileResponse(
-        id="p1",
-        identity_id="i1",
-        profile_type="STUDENT",
+        id=EntityId.new(),
+        identity_id=EntityId.new(),
+        profile_type=ProfileType.STUDENT,
         display_name="Student",
         completeness_percentage=100,
         bio=None,
@@ -35,9 +37,9 @@ async def test_in_process_profile_provider_maps_student():
 async def test_in_process_profile_provider_maps_scout():
     mock_use_case = AsyncMock()
     mock_use_case.execute.return_value = ProfileResponse(
-        id="p1",
-        identity_id="i1",
-        profile_type="SCOUT",
+        id=EntityId.new(),
+        identity_id=EntityId.new(),
+        profile_type=ProfileType.SCOUT,
         display_name="Scout",
         completeness_percentage=100,
         bio=None,
