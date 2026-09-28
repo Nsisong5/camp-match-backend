@@ -43,7 +43,12 @@ The `AvailabilityPort` provides the contract for other modules (like Booking) to
 - **Search**: Will consume `ListActiveListings`'s underlying data.
 - **Booking**: Will consume `AvailabilityPort` directly.
 
+## Media Management & Legacy Compatibility
+- Listings support media storage backed by the Media/File module (`listing_media.media_id`).
+- `POST /api/v1/listings/{listing_id}/media`: Multipart upload for listing photos (validated as `LISTING_PHOTO` with ownership permission check).
+- `listing_media.media_url` is **deprecated** but retained for existing legacy rows.
+- Listing detail responses serialize media items as unified objects: `{ "type": "media", "media_id": "...", "stream_path": "..." }` or `{ "type": "legacy_url", "url": "..." }`.
+
 ## Known Limitations
-- Media storage is limited to URLs.
 - `GET /listings` is a basic browse endpoint; advanced search is not implemented.
 - No direct `DuplicateProperty` or `UnauthorizedListingOperation` independent error triggers exist (uses standard errors).

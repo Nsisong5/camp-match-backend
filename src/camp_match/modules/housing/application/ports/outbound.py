@@ -1,15 +1,16 @@
-"""Module Housing: outbound.py"""
-"""Housing outbound ports."""
+from __future__ import annotations
 
-from typing import Protocol
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol, Any
 
-from camp_match.modules.housing.domain.entities import Property, Unit, Listing
+from camp_match.modules.housing.domain.entities import Listing, Property, Unit
 from camp_match.modules.housing.domain.value_objects import PropertyType
 from camp_match.modules.security.domain.value_objects import Permission
+from camp_match.shared_kernel.application.pagination import Page, PageRequest
 from camp_match.shared_kernel.domain.identifiers import EntityId
-from camp_match.shared_kernel.domain.clock import Clock
-from camp_match.shared_kernel.application.pagination import PageRequest, Page
-from camp_match.shared_kernel.application.unit_of_work import UnitOfWork
+
 
 class PropertyRepository(Protocol):
     async def add(self, property_: Property) -> None:
@@ -18,10 +19,10 @@ class PropertyRepository(Protocol):
     async def get_by_id(self, property_id: EntityId) -> Property | None:
         ...
 
-    async def update(self, property_: Property) -> None:
+    async def list_by_provider(self, provider_id: EntityId, page: PageRequest) -> Page[Property]:
         ...
-    
-    async def list_for_provider(self, provider_id: EntityId, page: PageRequest) -> Page[Property]:
+
+    async def update(self, property_: Property) -> None:
         ...
 
 
@@ -55,6 +56,18 @@ class ListingRepository(Protocol):
     async def get_by_unit_id(self, unit_id: EntityId) -> Listing | None:
         ...
 
+    async def add_media(
+        self,
+        listing_id: EntityId,
+        media_id: EntityId | None = None,
+        media_url: str | None = None,
+        display_order: int = 0,
+    ) -> uuid.UUID:
+        ...
+
+    async def get_media_for_listing(self, listing_id: EntityId) -> list[Any]:
+        ...
+
     async def list_active(
         self, 
         campus_id: EntityId | None, 
@@ -79,6 +92,6 @@ class AuthorizationService(Protocol):
         self,
         identity_id: EntityId,
         permission: Permission,
-        resource_owner_id: EntityId | None = None
+        resource_owner_id: EntityId | None = None,
     ) -> None:
         ...

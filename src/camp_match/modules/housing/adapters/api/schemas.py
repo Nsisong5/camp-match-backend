@@ -1,13 +1,21 @@
+from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
-from uuid import UUID
 from typing import List, Optional
+from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
+
+from camp_match.modules.housing.domain.value_objects import (
+    BillingPeriod,
+    Currency,
+    PropertyType,
+)
+
 
 class PropertyResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     provider_id: UUID
-    property_type: str
+    property_type: PropertyType
     name: str
     description: Optional[str]
     address: str
@@ -16,28 +24,22 @@ class PropertyResponseSchema(BaseModel):
     campus_id: Optional[UUID]
     status: str
 
-from camp_match.modules.housing.domain.value_objects import PropertyType, Currency, BillingPeriod
-
 class CreatePropertySchema(BaseModel):
-    property_type: PropertyType
     name: str
+    property_type: PropertyType
     description: Optional[str] = None
     address: str
-    latitude: float
-    longitude: float
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
     campus_id: Optional[UUID] = None
 
 class UpdatePropertySchema(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     address: Optional[str] = None
-    has_water: Optional[bool] = None
-    has_electricity: Optional[bool] = None
-    has_security: Optional[bool] = None
-    has_parking: Optional[bool] = None
-    has_generator: Optional[bool] = None
-    has_cctv: Optional[bool] = None
-    has_wifi: Optional[bool] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    campus_id: Optional[UUID] = None
 
 class UnitResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -78,6 +80,7 @@ class ListingResponseSchema(BaseModel):
     description: Optional[str]
     price: PriceSchema
     status: str
+    media: List[dict] = []
 
 class CreateListingSchema(BaseModel):
     property_id: UUID

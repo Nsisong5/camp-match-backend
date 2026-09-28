@@ -50,6 +50,7 @@ class UpdateStudentProfileUseCase:
             bio=profile.bio,
             phone_number=profile.phone_number,
             avatar_url=profile.avatar_url,
+            avatar_media_id=profile.avatar_media_id,
             student_details=profile.student_details.to_dict() if profile.student_details else None, # type: ignore
             scout_details=profile.scout_details.to_dict() if profile.scout_details else None, # type: ignore
         )

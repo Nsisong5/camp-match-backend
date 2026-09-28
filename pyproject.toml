@@ -139,6 +139,36 @@ forbidden_modules = [
     "camp_match.modules.university_location.adapters.persistence"
 ]
 
+[[tool.importlinter.contracts]]
+name = "Search Domain must stay framework-free"
+type = "forbidden"
+source_modules = ["camp_match.modules.search.domain"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Search Application must not import frameworks"
+type = "forbidden"
+source_modules = ["camp_match.modules.search.application"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+
+[[tool.importlinter.contracts]]
+name = "Search Adapters are private"
+type = "forbidden"
+source_modules = ["camp_match.modules"]
+excluded_modules = ["camp_match.modules.search"]
+forbidden_modules = ["camp_match.modules.search.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "Search adapters import restrictions"
+type = "forbidden"
+source_modules = ["camp_match.modules.search.adapters"]
+forbidden_modules = [
+    "camp_match.modules.housing.adapters",
+    "camp_match.modules.university_location.adapters",
+    "camp_match.modules.profile.adapters",
+    "camp_match.modules.verification.adapters"
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

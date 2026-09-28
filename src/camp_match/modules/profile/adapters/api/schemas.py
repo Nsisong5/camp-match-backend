@@ -65,6 +65,8 @@ class ProfileResponseSchema(BaseModel):
     bio: str | None = None
     phone_number: str | None = None
     avatar_url: str | None = None
+    avatar_media_id: UUID | None = None
+    avatar: dict | None = None
     student_details: StudentDetailsSchema | None = None
     scout_details: ScoutDetailsSchema | None = None
 
@@ -78,6 +80,8 @@ class PublicProfileResponseSchema(BaseModel):
     completeness_percentage: float
     bio: str | None = None
     avatar_url: str | None = None
+    avatar_media_id: UUID | None = None
+    avatar: dict | None = None
     student_details: dict | None = None
     scout_details: dict | None = None
 

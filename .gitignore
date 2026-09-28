@@ -65,3 +65,5 @@ test_*.py
 AI_state/
 
 
+modules_docs/
+module_docs/

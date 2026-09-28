@@ -34,6 +34,7 @@ class SqlAlchemyProfileRepository:
             bio=profile.bio,
             phone_number=profile.phone_number,
             avatar_url=profile.avatar_url,
+            avatar_media_id=str(profile.avatar_media_id.value) if profile.avatar_media_id else None,
             profile_type=profile.profile_type,
         )
         self._session.add(model)
@@ -92,6 +93,7 @@ class SqlAlchemyProfileRepository:
             model.bio = profile.bio
             model.phone_number = profile.phone_number
             model.avatar_url = profile.avatar_url
+            model.avatar_media_id = str(profile.avatar_media_id.value) if profile.avatar_media_id else None
 
     async def update_student_extension(self, profile: Profile) -> None:
         stmt = select(StudentProfileModel).where(StudentProfileModel.profile_id == str(profile.id.value))
@@ -153,4 +155,5 @@ class SqlAlchemyProfileRepository:
             bio=model.bio,
             phone_number=model.phone_number,
             avatar_url=model.avatar_url,
+            avatar_media_id=EntityId(model.avatar_media_id) if model.avatar_media_id else None,
         )

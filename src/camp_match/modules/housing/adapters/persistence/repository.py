@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select, and_, update, func
 from sqlalchemy.orm import selectinload
 
 from camp_match.modules.housing.adapters.persistence.models import (
+    ListingMediaModel,
     ListingModel,
     PropertyModel,
     UnitModel,
@@ -31,25 +33,18 @@ class SqlAlchemyPropertyRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def add(self, prop: Property) -> None:
+    async def add(self, property_: Property) -> None:
         model = PropertyModel(
-            id=prop.id.value,
-            provider_id=prop.provider_id.value,
-            property_type=prop.property_type.value,
-            name=prop.name,
-            description=prop.description,
-            address=prop.address,
-            latitude=prop.coordinates.latitude,
-            longitude=prop.coordinates.longitude,
-            campus_id=prop.campus_id.value if prop.campus_id else None,
-            has_water=prop.has_water,
-            has_electricity=prop.has_electricity,
-            has_security=prop.has_security,
-            has_parking=prop.has_parking,
-            has_generator=prop.has_generator,
-            has_cctv=prop.has_cctv,
-            has_wifi=prop.has_wifi,
-            status=prop.status.value,
+            id=property_.id.value,
+            provider_id=property_.provider_id.value,
+            property_type=property_.property_type.value,
+            name=property_.name,
+            description=property_.description,
+            address=property_.address,
+            latitude=property_.coordinates.latitude,
+            longitude=property_.coordinates.longitude,
+            campus_id=property_.campus_id.value if property_.campus_id else None,
+            status=property_.status.value,
         )
         self._session.add(model)
 
@@ -59,22 +54,37 @@ class SqlAlchemyPropertyRepository:
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
-    async def update(self, prop: Property) -> None:
-        stmt = select(PropertyModel).where(PropertyModel.id == prop.id.value)
+    async def list_by_provider(self, provider_id: EntityId, page: PageRequest) -> Page[Property]:
+        stmt = select(PropertyModel).where(PropertyModel.provider_id == provider_id.value)
+        
+        # Count total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_res = await self._session.execute(count_stmt)
+        total = total_res.scalar_one()
+
+        # Apply pagination
+        offset = (page.page - 1) * page.page_size
+        stmt = stmt.offset(offset).limit(page.page_size)
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+
+        items = [self._to_domain(m) for m in models]
+        return Page(items=items, total=total, page=page.page, page_size=page.page_size)
+
+    list_for_provider = list_by_provider
+
+    async def update(self, property_: Property) -> None:
+        stmt = select(PropertyModel).where(PropertyModel.id == property_.id.value)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         if model:
-            model.name = prop.name
-            model.description = prop.description
-            model.address = prop.address
-            model.status = prop.status.value
-            model.has_water = prop.has_water
-            model.has_electricity = prop.has_electricity
-            model.has_security = prop.has_security
-            model.has_parking = prop.has_parking
-            model.has_generator = prop.has_generator
-            model.has_cctv = prop.has_cctv
-            model.has_wifi = prop.has_wifi
+            model.name = property_.name
+            model.description = property_.description
+            model.address = property_.address
+            model.latitude = property_.coordinates.latitude
+            model.longitude = property_.coordinates.longitude
+            model.campus_id = property_.campus_id.value if property_.campus_id else None
+            model.status = property_.status.value
 
     def _to_domain(self, model: PropertyModel) -> Property:
         return Property(
@@ -84,43 +94,13 @@ class SqlAlchemyPropertyRepository:
             name=model.name,
             description=model.description,
             address=model.address,
-            coordinates=Coordinates(latitude=float(model.latitude), longitude=float(model.longitude)),
+            coordinates=Coordinates(latitude=model.latitude, longitude=model.longitude),
             campus_id=EntityId(model.campus_id) if model.campus_id else None,
-            has_water=model.has_water,
-            has_electricity=model.has_electricity,
-            has_security=model.has_security,
-            has_parking=model.has_parking,
-            has_generator=model.has_generator,
-            has_cctv=model.has_cctv,
-            has_wifi=model.has_wifi,
             status=PropertyStatus(model.status),
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
 
-    async def list_for_provider(self, provider_id: EntityId, page: PageRequest) -> Page[Property]:
-        stmt = select(PropertyModel).where(PropertyModel.provider_id == provider_id.value)
-        
-        # Count total for pagination
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = await self._session.scalar(count_stmt) or 0
-
-        # Apply pagination
-        stmt = stmt.offset((page.page - 1) * page.page_size).limit(page.page_size)
-        
-        result = await self._session.execute(stmt)
-        models = result.scalars().all()
-        
-        return Page(
-            items=[self._to_domain(m) for m in models],
-            total=total,
-            page=page.page,
-            page_size=page.page_size
-        )
-
-
-
-# ... (other imports)
 
 class SqlAlchemyUnitRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -236,14 +216,40 @@ class SqlAlchemyListingRepository:
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
+    async def add_media(
+        self,
+        listing_id: EntityId,
+        media_id: EntityId | None = None,
+        media_url: str | None = None,
+        display_order: int = 0,
+    ) -> uuid.UUID:
+        media_row_id = uuid.uuid4()
+        model = ListingMediaModel(
+            id=media_row_id,
+            listing_id=listing_id.value,
+            media_id=media_id.value if media_id else None,
+            media_url=media_url,
+            display_order=display_order,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return media_row_id
+
+    async def get_media_for_listing(self, listing_id: EntityId) -> list[ListingMediaModel]:
+        stmt = (
+            select(ListingMediaModel)
+            .where(ListingMediaModel.listing_id == listing_id.value)
+            .order_by(ListingMediaModel.display_order.asc(), ListingMediaModel.created_at.asc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     async def list_active(
         self,
         campus_id: EntityId | None,
         property_type: PropertyType | None,
         page: PageRequest
     ) -> Page[Listing]:
-        # Join with UnitModel to check availability (occupied_count < total_capacity)
-        # Join with PropertyModel to filter by campus_id and property_type
         stmt = (
             select(ListingModel)
             .join(UnitModel, ListingModel.unit_id == UnitModel.id)
@@ -261,22 +267,17 @@ class SqlAlchemyListingRepository:
         if property_type:
             stmt = stmt.where(PropertyModel.property_type == property_type.value)
 
-        # Count total for pagination
         count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = await self._session.scalar(count_stmt) or 0
+        total_res = await self._session.execute(count_stmt)
+        total = total_res.scalar_one()
 
-        # Apply pagination
-        stmt = stmt.offset((page.page - 1) * page.page_size).limit(page.page_size)
-        
+        offset = (page.page - 1) * page.page_size
+        stmt = stmt.offset(offset).limit(page.page_size)
         result = await self._session.execute(stmt)
         models = result.scalars().all()
-        
-        return Page(
-            items=[self._to_domain(m) for m in models],
-            total=total,
-            page=page.page,
-            page_size=page.page_size
-        )
+
+        items = [self._to_domain(m) for m in models]
+        return Page(items=items, total=total, page=page.page, page_size=page.page_size)
 
     def _to_domain(self, model: ListingModel) -> Listing:
         return Listing(

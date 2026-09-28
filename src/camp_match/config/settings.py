@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "placeholder-key-for-dev-only-change-in-prod"
     jwt_access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
+    media_storage_path: str = "./var/media"
+    media_access_token_secret: str = "media-secret-key-placeholder"
+    media_access_token_ttl_seconds: int = 300
 
 
 @lru_cache

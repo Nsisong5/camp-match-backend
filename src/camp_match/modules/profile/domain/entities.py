@@ -1,4 +1,3 @@
-
 from camp_match.modules.profile.domain.value_objects import (
     ProfileType,
     ScoutProfileDetails,
@@ -18,6 +17,7 @@ class Profile:
         bio: str | None = None,
         phone_number: str | None = None,
         avatar_url: str | None = None,
+        avatar_media_id: EntityId | None = None,
     ) -> None:
         if not (1 <= len(display_name.strip()) <= 100):
             raise ValueError("display_name must be 1–100 characters")
@@ -33,6 +33,7 @@ class Profile:
         self._bio = bio
         self._phone_number = phone_number
         self._avatar_url = avatar_url
+        self._avatar_media_id = avatar_media_id
         
         if student_details:
             self._profile_type = ProfileType.STUDENT
@@ -65,8 +66,11 @@ class Profile:
     def avatar_url(self) -> str | None: return self._avatar_url
 
     @property
+    def avatar_media_id(self) -> EntityId | None: return self._avatar_media_id
+
+    @property
     def completeness_percentage(self) -> float:
-        core_fields = [self._bio, self._phone_number, self._avatar_url]
+        core_fields = [self._bio, self._phone_number, self._avatar_url or self._avatar_media_id]
         if self._profile_type == ProfileType.STUDENT and self._student_details:
             details_fields = [
                 self._student_details.university_name,
@@ -117,6 +121,11 @@ class Profile:
             self._phone_number = phone_number
         if avatar_url is not None:
             self._avatar_url = avatar_url
+            self._avatar_media_id = None
+
+    def set_avatar_media(self, media_id: EntityId) -> None:
+        self._avatar_media_id = media_id
+        self._avatar_url = None
 
     def update_student_details(self, details: StudentProfileDetails) -> None:
         if self._profile_type != ProfileType.STUDENT:

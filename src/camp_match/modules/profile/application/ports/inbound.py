@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+from camp_match.modules.profile.domain.entities import Profile
 from camp_match.modules.profile.domain.value_objects import (
     AccommodationTypePreference,
     CleanlinessPreference,
@@ -32,6 +33,7 @@ class ProfileResponse:
     bio: str | None = None
     phone_number: str | None = None
     avatar_url: str | None = None
+    avatar_media_id: EntityId | None = None
     student_details: dict[str, str | int] | None = None
     scout_details: dict[str, str | int] | None = None
 
@@ -70,20 +72,13 @@ class UpdateScoutProfileRequest:
     years_active: int | None = None
     availability_status: ScoutAvailabilityStatus | None = None
 
-class CreateProfile(Protocol):
-    async def execute(self, request: CreateProfileRequest) -> ProfileResponse: ...
+class ProfileRepository(Protocol):
+    async def add(self, profile: Profile) -> None: ...
+    async def get_by_identity_id(self, identity_id: EntityId) -> Profile | None: ...
+    async def get_by_id(self, profile_id: EntityId) -> Profile | None: ...
+    async def update_core(self, profile: Profile) -> None: ...
+    async def update_student_extension(self, profile: Profile) -> None: ...
+    async def update_scout_extension(self, profile: Profile) -> None: ...
 
-class GetCurrentUserProfile(Protocol):
-    async def execute(self, request: GetProfileRequest) -> ProfileResponse: ...
-
-class GetPublicProfile(Protocol):
-    async def execute(self, request: GetPublicProfileRequest) -> ProfileResponse: ...
-
-class UpdateProfile(Protocol):
-    async def execute(self, request: UpdateProfileRequest) -> ProfileResponse: ...
-
-class UpdateStudentProfile(Protocol):
-    async def execute(self, request: UpdateStudentProfileRequest) -> ProfileResponse: ...
-
-class UpdateScoutProfile(Protocol):
-    async def execute(self, request: UpdateScoutProfileRequest) -> ProfileResponse: ...
+class IdentityProvider(Protocol):
+    async def get_identity(self, identity_id: EntityId) -> object | None: ...

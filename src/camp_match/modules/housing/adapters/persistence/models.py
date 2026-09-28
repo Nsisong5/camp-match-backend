@@ -97,6 +97,7 @@ class ListingMediaModel(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
     listing_id: Mapped[UUID] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
-    media_url: Mapped[str] = mapped_column(String, nullable=False)
+    media_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    media_url: Mapped[str | None] = mapped_column(String, nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

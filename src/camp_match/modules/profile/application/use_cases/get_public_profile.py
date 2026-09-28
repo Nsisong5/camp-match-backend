@@ -19,11 +19,8 @@ class GetPublicProfileUseCase:
         if not profile:
             raise ProfileNotFound("Profile not found.")
             
-        # Log: "public_profile_viewed", the viewer's identity id (not provided in request), the viewed profile id
-        # I'll log only the viewed profile id for now as viewer id is not available in request.
         logger.info("public_profile_viewed", profile_id=str(profile.id))
         
-        # Public response: core fields minus phone_number, plus business_name/business_description if Scout
         student_details = None
         scout_details = None
         
@@ -42,6 +39,7 @@ class GetPublicProfileUseCase:
             bio=profile.bio,
             phone_number=None, # Public: No phone number
             avatar_url=profile.avatar_url,
+            avatar_media_id=profile.avatar_media_id,
             student_details=student_details,
             scout_details=scout_details,
         )

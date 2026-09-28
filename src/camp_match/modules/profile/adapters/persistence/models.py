@@ -20,6 +20,7 @@ class ProfileModel(Base):
     bio = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True)
+    avatar_media_id = Column(UUID(as_uuid=True), nullable=True)
     profile_type = Column(SQLEnum(ProfileType), nullable=False)
 
 class StudentProfileModel(Base):

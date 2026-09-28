@@ -9,6 +9,12 @@ from camp_match.config.settings import get_settings
 
 # Ensure all models are imported so Alembic registers them on Base.metadata
 from camp_match.platform.db.base import Base
+from camp_match.modules.identity.adapters.persistence.models import AccountModel, RefreshTokenModel
+from camp_match.modules.security.adapters.persistence.models import SecurityUserRoleModel
+from camp_match.modules.profile.adapters.persistence.models import ProfileModel, StudentProfileModel, ScoutProfileModel
+from camp_match.modules.university_location.adapters.persistence.models import UniversityModel, CampusModel
+from camp_match.modules.housing.adapters.persistence.models import PropertyModel, UnitModel, ListingModel, ListingMediaModel
+from camp_match.modules.media.adapters.persistence.models import MediaFileModel
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

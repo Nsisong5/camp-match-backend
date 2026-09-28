@@ -8,6 +8,8 @@ from camp_match.modules.identity.adapters.api.router import router as auth_route
 from camp_match.modules.profile.adapters.api.router import router as profile_router
 from camp_match.modules.university_location.adapters.api.router import router as university_router
 from camp_match.modules.housing.adapters.api.router import router as housing_router
+from camp_match.modules.search.adapters.api.router import router as search_router
+from camp_match.modules.media.adapters.api.router import router as media_router
 from camp_match.platform.db.session import create_engine, create_session_factory
 from camp_match.platform.errors.http_error_handlers import register_error_handlers
 from camp_match.platform.logging.middleware import RequestIDMiddleware
@@ -33,6 +35,8 @@ def create_app() -> FastAPI:
     app.include_router(profile_router)
     app.include_router(university_router)
     app.include_router(housing_router)
+    app.include_router(search_router)
+    app.include_router(media_router)
 
     @app.get("/health", tags=["infrastructure"])
     async def health() -> dict[str, str]:
